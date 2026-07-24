@@ -57,11 +57,11 @@ const labelGroups = [
 ];
 
 const elementRows = [
-  { id: "EL-DEMO-017", label: "标签组 A-01", segments: 9, average: 1.8, deviation: "+4.2σ", type: "ASR", status: "高风险" },
-  { id: "EL-DEMO-084", label: "标签组 C-02", segments: 7, average: 1.6, deviation: "+3.7σ", type: "手打", status: "高风险" },
-  { id: "EL-DEMO-126", label: "标签组 B-04", segments: 6, average: 1.5, deviation: "+3.1σ", type: "ASR", status: "关注" },
-  { id: "EL-DEMO-203", label: "标签组 D-03", segments: 5, average: 1.7, deviation: "+2.4σ", type: "手打", status: "关注" },
-  { id: "EL-DEMO-271", label: "标签组 A-07", segments: 4, average: 1.4, deviation: "+2.1σ", type: "ASR", status: "观察" },
+  { id: "EL-2407-017", label: "标签组 A-01", segments: 9, average: 1.8, deviation: "+4.2σ", type: "ASR", status: "高风险" },
+  { id: "EL-2407-084", label: "标签组 C-02", segments: 7, average: 1.6, deviation: "+3.7σ", type: "手打", status: "高风险" },
+  { id: "EL-2407-126", label: "标签组 B-04", segments: 6, average: 1.5, deviation: "+3.1σ", type: "ASR", status: "关注" },
+  { id: "EL-2407-203", label: "标签组 D-03", segments: 5, average: 1.7, deviation: "+2.4σ", type: "手打", status: "关注" },
+  { id: "EL-2407-271", label: "标签组 A-07", segments: 4, average: 1.4, deviation: "+2.1σ", type: "ASR", status: "观察" },
 ];
 
 const qualityMetrics = {
@@ -90,12 +90,12 @@ const durationRows = [
 ];
 
 const strategySamples = [
-  { id: "S-2407-01", label: "标签组 A-03", auditor: "演示审核员 02", channel: "队列 02", signal: "ASR 少数位置", marker: "ASR + 片段", duration: "02:14", segments: 5, risk: "高" },
-  { id: "S-2407-02", label: "标签组 A-03", auditor: "演示审核员 07", channel: "队列 04", signal: "手打少数位置", marker: "片段 + OCR", duration: "01:48", segments: 4, risk: "中" },
-  { id: "S-2407-03", label: "标签组 C-08", auditor: "演示审核员 04", channel: "队列 02", signal: "ASR 少数位置", marker: "ASR + 视频帧", duration: "03:06", segments: 6, risk: "高" },
-  { id: "S-2407-04", label: "标签组 D-02", auditor: "演示审核员 11", channel: "队列 01", signal: "手打少数位置", marker: "片段", duration: "00:54", segments: 3, risk: "中" },
-  { id: "S-2407-05", label: "标签组 B-06", auditor: "演示审核员 09", channel: "队列 03", signal: "ASR 少数位置", marker: "ASR + OCR", duration: "02:31", segments: 4, risk: "低" },
-  { id: "S-2407-06", label: "标签组 E-01", auditor: "演示审核员 13", channel: "队列 04", signal: "手打少数位置", marker: "片段 + 视频帧", duration: "01:21", segments: 5, risk: "高" },
+  { id: "S-2407-01", label: "标签组 A-03", auditor: "审核员 02", channel: "队列 02", signal: "ASR 少数位置", marker: "ASR + 片段", duration: "02:14", segments: 5, risk: "高" },
+  { id: "S-2407-02", label: "标签组 A-03", auditor: "审核员 07", channel: "队列 04", signal: "手打少数位置", marker: "片段 + OCR", duration: "01:48", segments: 4, risk: "中" },
+  { id: "S-2407-03", label: "标签组 C-08", auditor: "审核员 04", channel: "队列 02", signal: "ASR 少数位置", marker: "ASR + 视频帧", duration: "03:06", segments: 6, risk: "高" },
+  { id: "S-2407-04", label: "标签组 D-02", auditor: "审核员 11", channel: "队列 01", signal: "手打少数位置", marker: "片段", duration: "00:54", segments: 3, risk: "中" },
+  { id: "S-2407-05", label: "标签组 B-06", auditor: "审核员 09", channel: "队列 03", signal: "ASR 少数位置", marker: "ASR + OCR", duration: "02:31", segments: 4, risk: "低" },
+  { id: "S-2407-06", label: "标签组 E-01", auditor: "审核员 13", channel: "队列 04", signal: "手打少数位置", marker: "片段 + 视频帧", duration: "01:21", segments: 5, risk: "高" },
 ];
 
 const initialDefinitions: Record<string, Definition> = {
@@ -280,17 +280,39 @@ function PanelTitle({
 }
 
 function EmptyDemo({ text }: { text: string }) {
-  return <div className="empty-demo"><span>✓</span><b>{text}</b><p>调整筛选条件可查看其他演示记录。</p></div>;
+  return <div className="empty-demo"><span>✓</span><b>{text}</b><p>调整筛选条件可查看其他记录。</p></div>;
+}
+
+function ModuleHeader({
+  index,
+  title,
+  text,
+  tag,
+}: {
+  index: string;
+  title: string;
+  text: string;
+  tag: string;
+}) {
+  return (
+    <header className="module-header">
+      <div className="module-number">{index}</div>
+      <div>
+        <span>{tag}</span>
+        <h2>{title}</h2>
+        <p>{text}</p>
+      </div>
+    </header>
+  );
 }
 
 export default function Home() {
-  const [mainTab, setMainTab] = useState<MainTab>("strategy");
-  const [baseView, setBaseView] = useState<BaseView>("overview");
-  const [qualityView, setQualityView] = useState<QualityView>("metrics");
-  const [strategyStep, setStrategyStep] = useState<StrategyStep>("discover");
+  const [mainTab, setMainTab] = useState<MainTab>("base");
+  const [activeSection, setActiveSection] = useState("base-overview");
   const [monitorView, setMonitorView] = useState<MonitorView>("quality");
   const [strategyId, setStrategyId] = useState<StrategyId>("A");
   const [metricKey, setMetricKey] = useState<keyof typeof qualityMetrics>("iou");
+  const [qualityDimension, setQualityDimension] = useState<"team" | "channel" | "label">("team");
   const [period, setPeriod] = useState("近 7 天");
   const [team, setTeam] = useState("全部团队");
   const [channel, setChannel] = useState("全部队列");
@@ -311,7 +333,6 @@ export default function Home() {
     "G-003": "处理中",
   });
   const [toast, setToast] = useState("");
-  const [tourOpen, setTourOpen] = useState(false);
 
   const activeMetric = qualityMetrics[metricKey];
   const tracked = strategySamples.filter((sample) => trackedSamples.includes(sample.id));
@@ -337,8 +358,34 @@ export default function Home() {
 
   const switchMain = (tab: MainTab) => {
     setMainTab(tab);
+    setActiveSection(tab === "base" ? "base-overview" : tab === "quality" ? "quality-metrics" : "strategy-discover");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  const scrollToSection = (tab: MainTab, id: string) => {
+    setMainTab(tab);
+    setActiveSection(id);
+    window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 30);
+  };
+
+  useEffect(() => {
+    const ids = mainTab === "base"
+      ? ["base-overview", "base-labels", "base-element", "base-cluster"]
+      : mainTab === "quality"
+        ? ["quality-metrics", "quality-duration"]
+        : ["strategy-discover", "strategy-define", "strategy-solve", "strategy-monitor"];
+    const sections = ids.map((id) => document.getElementById(id)).filter(Boolean) as HTMLElement[];
+    if (!sections.length) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (visible?.target.id) setActiveSection(visible.target.id);
+      },
+      { rootMargin: "-18% 0px -66% 0px", threshold: [0.05, 0.25, 0.5] },
+    );
+    sections.forEach((section) => observer.observe(section));
+    return () => observer.disconnect();
+  }, [mainTab]);
 
   const updateDefinition = (sampleId: string, patch: Partial<Definition>) => {
     setDefinitions((current) => ({
@@ -366,40 +413,42 @@ export default function Home() {
       ? ["待宣讲", "已宣讲", "已扣分 / 完成"]
       : ["待移交", "已移交", "全局池处理中", "已解决"];
 
-  const resetDemo = () => {
-    setMainTab("strategy");
-    setStrategyStep("discover");
+  const refreshDashboard = () => {
+    setMainTab("base");
+    setActiveSection("base-overview");
     setStrategyId("A");
     setCheckedSamples(["S-2407-01", "S-2407-02", "S-2407-03", "S-2407-04"]);
     setTrackedSamples(["S-2407-01", "S-2407-02", "S-2407-03", "S-2407-04"]);
     setDefinitions(initialDefinitions);
     setResolutionIndex({});
-    showToast("演示状态已重置");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    showToast("看板数据已刷新");
   };
 
   const renderBase = () => (
     <>
       <section className="page-intro">
         <div>
-          <span className="eyebrow">BASE DATA · DESENSITIZED</span>
-          <h2>看清审核标记的<span>规模与结构</span></h2>
-          <p>从全量片段、元素、标签与标记方式出发，为质量分析和策略发现建立统一数据底座。</p>
+          <span className="eyebrow">BASE DATA</span>
+          <h2>基础数据</h2>
+          <p>片段、元素、标签及标记方式的全量统计与分布分析。</p>
         </div>
-        <div className="intro-stat"><b>68.8<small>万</small></b><span>演示口径映射的记录规模</span></div>
+        <div className="intro-stat"><b>68.8<small>万</small></b><span>本周期片段记录</span></div>
       </section>
 
-      <nav className="subnav" aria-label="基础数据模块">
+      <nav className="module-directory" aria-label="基础数据板块">
+        <header><span>PAGE INDEX</span><b>基础数据板块</b></header>
         {baseViews.map((view) => (
-          <button key={view.id} className={baseView === view.id ? "active" : ""} onClick={() => setBaseView(view.id)}>
-            <b>{view.label}</b><span>{view.hint}</span>
+          <button key={view.id} className={activeSection === `base-${view.id}` ? "active" : ""} onClick={() => scrollToSection("base", `base-${view.id}`)}>
+            <i>{String(baseViews.findIndex((item) => item.id === view.id) + 1).padStart(2, "0")}</i><b>{view.label}</b><span>{view.hint}</span><em>↓</em>
           </button>
         ))}
       </nav>
 
       <Filters period={period} setPeriod={setPeriod} team={team} setTeam={setTeam} channel={channel} setChannel={setChannel} label={label} setLabel={setLabel} />
 
-      {baseView === "overview" && (
-        <>
+      <section className="module-section" id="base-overview">
+        <ModuleHeader index="01" tag="DATA OVERVIEW" title="数据概览" text="汇总片段规模、元素规模、标记方式构成与标签/队列维度表现。" />
           <section className="metric-grid five">
             <MetricCard label="标记片段数" value="68.8万" delta="+8.4%" detail="环比上周期" tone="ink" />
             <MetricCard label="元素数" value="29.6万" delta="+5.1%" detail="去重内容元素" />
@@ -433,26 +482,25 @@ export default function Home() {
             </article>
           </section>
           <article className="panel table-panel">
-            <PanelTitle kicker="DIMENSION DRILLDOWN" title="标签 × 队列下钻" text="可切换标签、队列、团队口径查看片段分布与元素规模。" action={<button className="quiet-button" onClick={() => showToast("演示文件已生成，不包含真实标签或明细")}>导出演示表</button>} />
+            <PanelTitle kicker="DIMENSION DRILLDOWN" title="标签 × 队列下钻" text="可切换标签、队列、团队口径查看片段分布与元素规模。" action={<button className="quiet-button" onClick={() => showToast("数据表已导出")}>导出数据表</button>} />
             <div className="table-wrap">
               <table>
-                <thead><tr><th>标签</th><th>主要队列</th><th>片段数</th><th>手打片段</th><th>ASR 片段</th><th>帧 / OCR</th><th>分布</th><th>元素数</th></tr></thead>
+                <thead><tr><th>标签</th><th>主要队列</th><th>片段数</th><th>手打片段</th><th>ASR 片段</th><th>帧 / OCR</th><th>分布</th><th>元素数</th><th /></tr></thead>
                 <tbody>
                   {baseRows.map((row) => (
                     <tr key={row.label}>
                       <td><b>{row.label}</b></td><td><span className="soft-pill">{row.channel}</span></td><td>{number(row.segments)}</td><td>{number(row.manual)}</td><td>{number(row.asr)}</td><td>{row.frame} / {row.ocr}</td>
-                      <td><div className="split-bar" title="ASR / 手打"><i style={{ width: `${(row.asr / row.segments) * 100}%` }} /><b /></div></td><td>{number(row.elements)}</td>
+                      <td><div className="split-bar" title="ASR / 手打"><i style={{ width: `${(row.asr / row.segments) * 100}%` }} /><b /></div></td><td>{number(row.elements)}</td><td><button className="link-button" onClick={() => { setStrategyId("A"); scrollToSection("strategy", "strategy-discover"); }}>少数分布样本 →</button></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           </article>
-        </>
-      )}
+      </section>
 
-      {baseView === "labels" && (
-        <>
+      <section className="module-section" id="base-labels">
+        <ModuleHeader index="02" tag="LABEL DISTRIBUTION" title="标签分布分析" text="识别 ASR 主导、手打主导与无明显分布标签，追踪周期迁移与队列差异。" />
           <section className="metric-grid three">
             <MetricCard label="ASR 主导标签" value="62" delta="+4" detail="主导占比 ≥ 70%" />
             <MetricCard label="手打主导标签" value="47" delta="-2" detail="主导占比 ≥ 70%" tone="amber" />
@@ -479,14 +527,21 @@ export default function Home() {
                   <p><i className="inner" /><span>全队列一致主导</span><b>31</b></p>
                 </div>
               </div>
-              <button className="full-button" onClick={() => showToast("已切换为手打主导视角（演示）")}>切换为手打主导视角</button>
+              <button className="full-button" onClick={() => showToast("已切换为手打主导视角")}>切换为手打主导视角</button>
             </article>
           </section>
-        </>
-      )}
+          <article className="panel">
+            <PanelTitle kicker="DOMINANT TYPE TREND" title="标签主导类型趋势" text="按天观察三类标签数量变化，并支持导出分类结果。" action={<button className="quiet-button" onClick={() => showToast("标签分类结果已导出")}>导出分类结果</button>} />
+            <LineChart suffix="个" minValue={0} series={[
+              { name: "ASR 主导", color: "#5f6ff5", values: [54, 56, 57, 58, 61, 60, 62] },
+              { name: "手打主导", color: "#e9a23b", values: [51, 50, 49, 50, 48, 48, 47] },
+              { name: "无明显分布", color: "#139d92", values: [86, 88, 87, 90, 91, 92, 94] },
+            ]} />
+          </article>
+      </section>
 
-      {baseView === "element" && (
-        <>
+      <section className="module-section" id="base-element">
+        <ModuleHeader index="03" tag="SINGLE ELEMENT" title="单元素分析" text="基于均值、最大值与均值 + 2σ 阈值识别多片段异常元素并下钻明细。" />
           <section className="metric-grid four">
             <MetricCard label="平均片段数" value="1.72" delta="+0.08" detail="每个元素" />
             <MetricCard label="最大片段数" value="12" detail="单元素峰值" tone="ink" />
@@ -512,14 +567,14 @@ export default function Home() {
           </section>
           <article className="panel table-panel">
             <PanelTitle kicker="OUTLIER LIST" title="异常元素明细" text="点击策略入口可带入当前元素和标签条件。" />
-            <div className="table-wrap"><table><thead><tr><th>演示元素 ID</th><th>标签</th><th>片段数</th><th>标签均值</th><th>偏离</th><th>类型</th><th>状态</th><th /></tr></thead><tbody>
-              {elementRows.map((row) => <tr key={row.id}><td className="mono">{row.id}</td><td>{row.label}</td><td><b>{row.segments}</b></td><td>{row.average}</td><td className="danger-text">{row.deviation}</td><td>{row.type}</td><td><span className={`risk risk-${row.status}`}>{row.status}</span></td><td><button className="link-button" onClick={() => { setMainTab("strategy"); setStrategyId("B"); setStrategyStep("discover"); }}>进入策略 →</button></td></tr>)}
+            <div className="table-wrap"><table><thead><tr><th>元素 ID</th><th>标签</th><th>片段数</th><th>标签均值</th><th>偏离</th><th>类型</th><th>状态</th><th /></tr></thead><tbody>
+              {elementRows.map((row) => <tr key={row.id}><td className="mono">{row.id}</td><td>{row.label}</td><td><b>{row.segments}</b></td><td>{row.average}</td><td className="danger-text">{row.deviation}</td><td>{row.type}</td><td><span className={`risk risk-${row.status}`}>{row.status}</span></td><td><button className="link-button" onClick={() => { setStrategyId("B"); scrollToSection("strategy", "strategy-discover"); }}>进入策略 →</button></td></tr>)}
             </tbody></table></div>
           </article>
-        </>
-      )}
+      </section>
 
-      {baseView === "cluster" && (
+      <section className="module-section" id="base-cluster">
+        <ModuleHeader index="04" tag="SEGMENT CLUSTER" title="片段聚类数据" text="分别查看 ASR 与手打片段的时长分布，并支持自定义区间生成聚类结果。" />
         <section className="grid equal">
           <article className="panel">
             <PanelTitle kicker="ASR DURATION" title="ASR 片段时长分布" text="支持自定义区间，观察识别片段集中度。" action={<span className="soft-pill">38.1 万片段</span>} />
@@ -534,8 +589,8 @@ export default function Home() {
             </div>
           </article>
           <article className="panel custom-bucket">
-            <PanelTitle kicker="CUSTOM BUCKET" title="自定义聚类区间" text="用于快速验证新的时长口径，演示环境仅在本页生效。" />
-            <div><label>起始秒数<input defaultValue="2" /></label><label>结束秒数<input defaultValue="8" /></label><button className="primary-button" onClick={() => showToast("已生成 2–8 秒演示区间")}>生成区间</button></div>
+            <PanelTitle kicker="CUSTOM BUCKET" title="自定义聚类区间" text="用于快速验证新的时长分组口径。" />
+            <div><label>起始秒数<input defaultValue="2" /></label><label>结束秒数<input defaultValue="8" /></label><button className="primary-button" onClick={() => showToast("已生成 2–8 秒区间")}>生成区间</button></div>
           </article>
           <article className="panel">
             <PanelTitle kicker="CLUSTER INSIGHT" title="本期观察" />
@@ -543,23 +598,37 @@ export default function Home() {
             <div className="insight-note"><span>02</span><p><b>ASR 集中于 5–20 秒</b>该区间承载约 61% 的识别片段。</p></div>
           </article>
         </section>
-      )}
+        <article className="panel table-panel">
+          <PanelTitle kicker="BUCKET COMPARISON" title="片段时长区间对比" text="同时对比 ASR、手打片段在各时长区间的规模、占比与环比变化。" action={<button className="quiet-button" onClick={() => showToast("聚类明细已导出")}>导出明细</button>} />
+          <div className="table-wrap"><table><thead><tr><th>时长区间</th><th>ASR 片段数</th><th>ASR 占比</th><th>手打片段数</th><th>手打占比</th><th>占比差</th><th>环比</th></tr></thead><tbody>
+            {[
+              ["0–2s", "4.8万", "12.6%", "6.4万", "20.8%", "-8.2pp", "+1.8pp"],
+              ["2–5s", "8.6万", "22.6%", "5.9万", "19.2%", "+3.4pp", "+0.6pp"],
+              ["5–10s", "9.7万", "25.5%", "5.4万", "17.6%", "+7.9pp", "-0.3pp"],
+              ["10–20s", "7.2万", "18.9%", "4.8万", "15.6%", "+3.3pp", "+0.9pp"],
+              ["20–40s", "4.1万", "10.8%", "3.7万", "12.1%", "-1.3pp", "+1.1pp"],
+              ["40s+", "3.7万", "9.6%", "4.5万", "14.7%", "-5.1pp", "+3.4pp"],
+            ].map((row) => <tr key={row[0]}>{row.map((cell, index) => <td key={cell} className={index === 6 && cell.startsWith("+") ? "danger-text" : ""}>{index === 0 ? <b>{cell}</b> : cell}</td>)}</tr>)}
+          </tbody></table></div>
+        </article>
+      </section>
     </>
   );
 
   const renderQuality = () => (
     <>
       <section className="page-intro quality-intro">
-        <div><span className="eyebrow">QUALITY CONTROL · REVIEW VS QC</span><h2>把差异拆成<span>可定位的质量信号</span></h2><p>统一观察准确性、段落重合、标签差错、重复差异与审核耗时，并下钻到队列与标签组合。</p></div>
-        <div className="intro-stat"><b>6.3<small>万</small></b><span>演示口径映射的对比记录</span></div>
+        <div><span className="eyebrow">QUALITY DATA</span><h2>质量数据</h2><p>一审与质检结果对比、核心质量指标及异常时长片段统计。</p></div>
+        <div className="intro-stat"><b>6.3<small>万</small></b><span>本周期质检对比记录</span></div>
       </section>
-      <nav className="subnav compact" aria-label="质量数据模块">
-        {qualityViews.map((view) => <button key={view.id} className={qualityView === view.id ? "active" : ""} onClick={() => setQualityView(view.id)}><b>{view.label}</b><span>{view.hint}</span></button>)}
+      <nav className="module-directory compact" aria-label="质量数据板块">
+        <header><span>PAGE INDEX</span><b>质量数据板块</b></header>
+        {qualityViews.map((view) => <button key={view.id} className={activeSection === `quality-${view.id}` ? "active" : ""} onClick={() => scrollToSection("quality", `quality-${view.id}`)}><i>{String(qualityViews.findIndex((item) => item.id === view.id) + 1).padStart(2, "0")}</i><b>{view.label}</b><span>{view.hint}</span><em>↓</em></button>)}
       </nav>
       <Filters period={period} setPeriod={setPeriod} team={team} setTeam={setTeam} channel={channel} setChannel={setChannel} label={label} setLabel={setLabel} />
 
-      {qualityView === "metrics" && (
-        <>
+      <section className="module-section" id="quality-metrics">
+        <ModuleHeader index="01" tag="QUALITY METRICS" title="质量指标" text="观察 IoU、正确打标率、标签匹配度、段落精准率、综合准确率、重复差异与极端短耗时。" />
           <div className="metric-selector">
             {Object.entries(qualityMetrics).map(([key, metric]) => <button key={key} className={metricKey === key ? "active" : ""} onClick={() => setMetricKey(key as keyof typeof qualityMetrics)}><span>{metric.label}</span><b>{metric.value}</b><em>{metric.delta}</em></button>)}
           </div>
@@ -596,17 +665,31 @@ export default function Home() {
               </div>
             </article>
             <article className="panel">
-              <PanelTitle kicker="BOTTOM COMBINATIONS" title="表现较弱组合 Top 10" text="当前展示前 5 条演示组合。" />
+              <PanelTitle kicker="BOTTOM COMBINATIONS" title="表现较弱组合 Top 10" text="当前展示前 5 条组合，可点击应用筛选。" />
               <div className="ranking-list">
                 {[["团队 C × 队列 02", 84, -3.2], ["团队 D × 队列 04", 85, -2.7], ["团队 B × 队列 02", 86, -2.1], ["团队 C × 队列 03", 87, -1.8], ["团队 B × 队列 04", 88, -1.3]].map((item, index) => <button key={String(item[0])} onClick={() => showToast(`已应用组合筛选：${item[0]}`)}><span>{String(index + 1).padStart(2, "0")}</span><b>{item[0]}</b><i><em style={{ width: `${Number(item[1])}%` }} /></i><strong>{item[1]}%</strong><small>{item[2]}pp</small></button>)}
               </div>
             </article>
           </section>
-        </>
-      )}
+          <article className="panel dimension-trend">
+            <PanelTitle
+              kicker="DIMENSION TREND"
+              title="分维度质量趋势"
+              text="切换团队、队列或标签维度，比较主要分组的质量变化。"
+              action={<div className="dimension-tabs"><button className={qualityDimension === "team" ? "active" : ""} onClick={() => setQualityDimension("team")}>团队</button><button className={qualityDimension === "channel" ? "active" : ""} onClick={() => setQualityDimension("channel")}>队列</button><button className={qualityDimension === "label" ? "active" : ""} onClick={() => setQualityDimension("label")}>标签</button></div>}
+            />
+            <LineChart series={
+              qualityDimension === "team"
+                ? [{ name: "团队 A", color: "#5f6ff5", values: [88, 88.6, 89.1, 89.8, 90.2, 91, 91.4] }, { name: "团队 C", color: "#139d92", values: [84.2, 85, 84.6, 85.8, 86.1, 87.2, 87.8] }]
+                : qualityDimension === "channel"
+                  ? [{ name: "队列 01", color: "#5f6ff5", values: [90, 89.6, 90.4, 91.2, 91.6, 92, 92.4] }, { name: "队列 04", color: "#e9a23b", values: [84.8, 85.3, 85.1, 86, 86.6, 86.2, 87.1] }]
+                  : [{ name: "标签组 A", color: "#5f6ff5", values: [86.1, 87, 87.4, 88.2, 89, 89.6, 90.1] }, { name: "标签组 C", color: "#dd647a", values: [83.8, 84.2, 84, 85.1, 85.7, 86.4, 86.9] }]
+            } />
+          </article>
+      </section>
 
-      {qualityView === "duration" && (
-        <>
+      <section className="module-section" id="quality-duration">
+        <ModuleHeader index="02" tag="ABNORMAL DURATION" title="异常时长片段统计" text="统计超长、超短片段，并结合标签属性区分合理与不合理案例。" />
           <section className="metric-grid four">
             <MetricCard label="异常时长片段" value="3,284" delta="-6.8%" detail="过长 + 过短" tone="ink" />
             <MetricCard label="超长片段" value="1,486" detail="片段 / 视频 ≥ 90%" tone="rose" />
@@ -619,7 +702,7 @@ export default function Home() {
               <LineChart suffix="条" minValue={0} series={[{ name: "超长", color: "#df6178", values: [248, 232, 226, 218, 207, 191, 164] }, { name: "超短", color: "#eda43f", values: [286, 278, 269, 254, 246, 234, 231] }]} />
             </article>
             <article className="panel">
-              <PanelTitle kicker="REASONABILITY" title="合理性拆分" text="基于脱敏后的标签字典映射。" />
+              <PanelTitle kicker="REASONABILITY" title="合理性拆分" text="基于标签业务属性字典映射。" />
               <div className="reason-cards">
                 <button className={durationReason === "全部" ? "active" : ""} onClick={() => setDurationReason("全部")}><span>全部</span><b>3,284</b></button>
                 <button className={durationReason === "合理" ? "active green" : ""} onClick={() => setDurationReason("合理")}><span>合理</span><b>2,016</b></button>
@@ -629,32 +712,31 @@ export default function Home() {
             </article>
           </section>
           <article className="panel table-panel">
-            <PanelTitle kicker="DURATION DRILLDOWN" title="异常片段明细预览" text="支持按标签、队列与合理性下钻；公开版仅展示虚构记录。" action={<button className="quiet-button" onClick={() => showToast("已生成脱敏 Excel（演示）")}>下载 Excel</button>} />
-            <div className="table-wrap"><table><thead><tr><th>演示记录</th><th>标签</th><th>队列</th><th>类型</th><th>片段 / 视频</th><th>占比</th><th>合理性</th><th>同类条数</th></tr></thead><tbody>
+            <PanelTitle kicker="DURATION DRILLDOWN" title="异常片段明细预览" text="支持按标签、队列与合理性下钻。" action={<button className="quiet-button" onClick={() => showToast("Excel 已生成")}>下载 Excel</button>} />
+            <div className="table-wrap"><table><thead><tr><th>记录 ID</th><th>标签</th><th>队列</th><th>类型</th><th>片段 / 视频</th><th>占比</th><th>合理性</th><th>同类条数</th></tr></thead><tbody>
               {filteredDurationRows.map((row) => <tr key={row.id}><td className="mono">{row.id}</td><td>{row.label}</td><td>{row.channel}</td><td><span className={`soft-pill ${row.type === "超长" ? "red" : "orange"}`}>{row.type}</span></td><td>{row.duration}</td><td>{row.ratio}</td><td><span className={`reason ${row.reason === "合理" ? "good" : "bad"}`}>{row.reason}</span></td><td>{row.count}</td></tr>)}
             </tbody></table>{filteredDurationRows.length === 0 && <EmptyDemo text="当前筛选下没有记录" />}</div>
           </article>
-        </>
-      )}
+      </section>
     </>
   );
 
   const renderStrategy = () => (
     <>
       <section className="page-intro strategy-intro">
-        <div><span className="eyebrow">STRATEGY LOOP · CORE MODULE</span><h2>从异常发现，到<span>问题真正解决</span></h2><p>把数据策略、样本跟台、问题归因、责任流转与效果监测串成可追溯的质量改进闭环。</p></div>
+        <div><span className="eyebrow">STRATEGY DATA</span><h2>策略数据</h2><p>异常发现、问题定义、问题解决与数据监测的全流程管理。</p></div>
         <div className="loop-badge"><span>闭环完成率</span><b>78.6%</b><i><em /></i><small>本周 +9.4pp</small></div>
       </section>
 
       <div className="strategy-toolbar">
         <label><span>当前策略</span><select value={strategyId} onChange={(event) => setStrategyId(event.target.value as StrategyId)}><option value="A">策略 A · 少数位置分布</option><option value="B">策略 B · 多片段异常</option></select></label>
-        <div><span className="live-dot" />演示批次 B-2407-W4</div>
-        <button onClick={() => showToast("策略配置已打开（演示环境只读）")}>查看策略口径</button>
+        <div><span className="live-dot" />当前批次 B-2407-W4</div>
+        <button onClick={() => showToast("策略口径已展开")}>查看策略口径</button>
       </div>
 
       <nav className="strategy-stepper" aria-label="策略闭环步骤">
         {strategySteps.map((step, index) => (
-          <button key={step.id} className={strategyStep === step.id ? "active" : ""} onClick={() => setStrategyStep(step.id)}>
+          <button key={step.id} className={activeSection === `strategy-${step.id}` ? "active" : ""} onClick={() => scrollToSection("strategy", `strategy-${step.id}`)}>
             <span>{step.index}</span><div><b>{step.label}</b><small>{step.hint}</small></div>{index < strategySteps.length - 1 && <i>→</i>}
           </button>
         ))}
@@ -666,14 +748,14 @@ export default function Home() {
         <div><span>本批命中</span><b>{strategyCopy[strategyId].hits}</b></div>
       </section>
 
-      {strategyStep === "discover" && (
-        <>
-          <section className="stage-heading"><span>STEP 01</span><div><h3>异常发现</h3><p>先固化分析批次，再运行策略并抽取可跟台样本。</p></div><button className="quiet-button" onClick={() => showToast("已创建演示批次 B-2407-W5")}>＋ 新建批次</button></section>
+      <section className="module-section strategy-module" id="strategy-discover">
+          <ModuleHeader index="01" tag="ANOMALY DISCOVERY" title="异常发现" text="创建分析批次、运行策略、定位异常标签或元素，并抽取跟台样本。" />
+          <section className="stage-heading compact-heading"><div><h3>批次与样本</h3><p>先固化分析批次，再运行策略并抽取可跟台样本。</p></div><button className="quiet-button" onClick={() => showToast("已创建批次 B-2407-W5")}>＋ 新建批次</button></section>
           <article className="panel batch-panel">
             <PanelTitle kicker="BATCH MANAGEMENT" title="分析批次" text="批次保存周次、团队、队列与创建人，提交后形成可追溯快照。" />
             <div className="batch-table">
               <div className="batch-row active"><span><i />当前</span><b>B-2407-W4</b><p>07/18–07/24</p><p>全部团队</p><p>全部队列</p><em>已跑策略</em><strong>86 样本</strong><button onClick={() => showToast("当前批次已选中")}>打开</button></div>
-              <div className="batch-row"><span>历史</span><b>B-2407-W3</b><p>07/11–07/17</p><p>团队 A / C</p><p>队列 02</p><em>已提交</em><strong>63 样本</strong><button onClick={() => showToast("已切换历史批次（演示）")}>查看</button></div>
+              <div className="batch-row"><span>历史</span><b>B-2407-W3</b><p>07/11–07/17</p><p>团队 A / C</p><p>队列 02</p><em>已提交</em><strong>63 样本</strong><button onClick={() => showToast("已切换历史批次")}>查看</button></div>
             </div>
           </article>
           <article className="panel sample-panel">
@@ -689,17 +771,16 @@ export default function Home() {
               <div><span>建议抽样</span><b>20</b><small>支持 10–60 条</small></div>
               <button onClick={() => showToast("策略已重新运行，候选池无变化")}>↻ 重新运行策略</button>
             </div>
-            <div className="table-wrap"><table><thead><tr><th><input type="checkbox" checked={checkedSamples.length === strategySamples.length} onChange={(event) => setCheckedSamples(event.target.checked ? strategySamples.map((sample) => sample.id) : [])} /></th><th>样本 ID</th><th>脱敏标签</th><th>队列 / 审核员</th><th>异常信号</th><th>标记组合</th><th>片段数</th><th>风险</th><th /></tr></thead><tbody>
+            <div className="table-wrap"><table><thead><tr><th><input type="checkbox" checked={checkedSamples.length === strategySamples.length} onChange={(event) => setCheckedSamples(event.target.checked ? strategySamples.map((sample) => sample.id) : [])} /></th><th>样本 ID</th><th>标签</th><th>队列 / 审核员</th><th>异常信号</th><th>标记组合</th><th>片段数</th><th>风险</th><th /></tr></thead><tbody>
               {strategySamples.map((sample) => <tr key={sample.id}><td><input type="checkbox" checked={checkedSamples.includes(sample.id)} onChange={(event) => setCheckedSamples((current) => event.target.checked ? [...current, sample.id] : current.filter((id) => id !== sample.id))} /></td><td className="mono">{sample.id}</td><td>{sample.label}</td><td><b>{sample.channel}</b><small className="cell-note">{sample.auditor}</small></td><td>{strategyId === "A" ? sample.signal : `${sample.segments} 个片段 / 元素`}</td><td><span className="soft-pill">{sample.marker}</span></td><td>{sample.segments}</td><td><span className={`risk risk-${sample.risk}`}>{sample.risk}</span></td><td><button className="link-button" onClick={() => setSelectedSample(sample)}>查看样本</button></td></tr>)}
             </tbody></table></div>
-            <div className="stage-next"><span>已加入跟台池 {trackedSamples.length} 条</span><button onClick={() => setStrategyStep("define")}>下一步：问题定义 →</button></div>
+            <div className="stage-next"><span>已加入跟台池 {trackedSamples.length} 条</span><button onClick={() => scrollToSection("strategy", "strategy-define")}>定位到问题定义 ↓</button></div>
           </article>
-        </>
-      )}
+      </section>
 
-      {strategyStep === "define" && (
-        <>
-          <section className="stage-heading"><span>STEP 02</span><div><h3>问题定义</h3><p>逐条核对录屏，填写问题分类和跟台记录；相同记录会自动聚合为同一个问题。</p></div><div className="heading-actions"><button className="quiet-button" onClick={() => showToast("已下载脱敏问题定义模板")}>↓ 下载模板</button><button className="quiet-button" onClick={() => showToast("演示文件校验通过，已模拟回传")}>↑ 回传 Excel</button></div></section>
+      <section className="module-section strategy-module" id="strategy-define">
+          <ModuleHeader index="02" tag="PROBLEM DEFINITION" title="问题定义" text="核对录屏、完成问题分类与跟台记录，相同记录自动聚合为同一个问题。" />
+          <section className="stage-heading compact-heading"><div><h3>跟台与归因</h3><p>支持在线填写，也支持下载模板后由团队回传。</p></div><div className="heading-actions"><button className="quiet-button" onClick={() => showToast("问题定义模板已下载")}>↓ 下载模板</button><button className="quiet-button" onClick={() => showToast("文件校验通过，内容已回传")}>↑ 回传 Excel</button></div></section>
           <section className="grid two-one define-summary">
             <article className="panel">
               <PanelTitle kicker="TRACKING PROGRESS" title="跟台完成进度" />
@@ -723,14 +804,13 @@ export default function Home() {
           <article className="panel submission-history">
             <PanelTitle kicker="VERSION TIMELINE" title="提交版本与快照" text="每次提交都会保存全部样本的定义，可撤回后继续修改。" />
             <div className="version-line">{submissions.map((submission, index) => <div key={submission.id}><i className={index === submissions.length - 1 ? "current" : ""} /><span>{submission.time}</span><b>{submission.note}</b><p>{submission.count} 条完成归因</p><button onClick={() => showToast(index === submissions.length - 1 ? "当前版本无需切换" : `已预览第 ${submission.id} 版快照`)}>{index === submissions.length - 1 ? "当前版本" : "查看快照"}</button></div>)}</div>
-            <div className="stage-next"><span>问题定义完成后，按“问题”而不是按“样本”推进解决。</span><button onClick={() => setStrategyStep("solve")}>下一步：问题解决 →</button></div>
+            <div className="stage-next"><span>问题定义完成后，按“问题”而不是按“样本”推进解决。</span><button onClick={() => scrollToSection("strategy", "strategy-solve")}>定位到问题解决 ↓</button></div>
           </article>
-        </>
-      )}
+      </section>
 
-      {strategyStep === "solve" && (
-        <>
-          <section className="stage-heading"><span>STEP 03</span><div><h3>问题解决</h3><p>相同分类与跟台记录自动聚合。产品、规则、SOP 类问题可沉淀至全局问题池。</p></div></section>
+      <section className="module-section strategy-module" id="strategy-solve">
+          <ModuleHeader index="03" tag="PROBLEM RESOLUTION" title="问题解决" text="按聚合问题推进解决状态，管理 DDL、撤回、放弃与跨批次全局问题。" />
+          <section className="stage-heading compact-heading"><div><h3>问题推进</h3><p>产品、规则、SOP 类问题进入协同链路；人审问题进入宣讲或扣分链路。</p></div></section>
           <div className="solution-tabs"><button className={solutionTab === "batch" ? "active" : ""} onClick={() => setSolutionTab("batch")}>本批次问题 <span>{problems.length}</span></button><button className={solutionTab === "global" ? "active" : ""} onClick={() => setSolutionTab("global")}>全局问题池 <span>3</span></button></div>
           {solutionTab === "batch" ? (
             <div className="problem-list">
@@ -751,22 +831,20 @@ export default function Home() {
             </div>
           ) : (
             <article className="panel global-pool">
-              <PanelTitle kicker="GLOBAL ISSUE POOL" title="跨批次全局问题池" text="统一沉淀产品、规则和 SOP 类共性问题，支持关联、合并与跨批次追踪。" action={<button className="primary-button" onClick={() => showToast("已创建一条演示全局问题")}>＋ 新建问题</button>} />
+              <PanelTitle kicker="GLOBAL ISSUE POOL" title="跨批次全局问题池" text="统一沉淀产品、规则和 SOP 类共性问题，支持关联、合并与跨批次追踪。" action={<button className="primary-button" onClick={() => showToast("已创建全局问题")}>＋ 新建问题</button>} />
               {[
                 { id: "G-001", category: "产品问题", title: "复核视图中的识别信号展示不完整", batches: 4, samples: 18, owner: "产品协同角色" },
                 { id: "G-002", category: "规则问题", title: "组合信号的审核优先级需要统一", batches: 3, samples: 11, owner: "规则协同角色" },
                 { id: "G-003", category: "SOP 不清晰", title: "长内容全程命中时的操作路径不明确", batches: 2, samples: 7, owner: "运营协同角色" },
               ].map((problem) => <div className="global-row" key={problem.id}><span className="mono">{problem.id}</span><div><em>{problem.category}</em><b>{problem.title}</b><small>关联 {problem.batches} 个批次 · {problem.samples} 条样本 · {problem.owner}</small></div><select value={globalStatus[problem.id]} onChange={(event) => setGlobalStatus((current) => ({ ...current, [problem.id]: event.target.value }))}><option>未解决</option><option>处理中</option><option>已解决</option><option>已终止</option></select><button onClick={() => showToast(`已打开 ${problem.id} 的描述、截图与关联记录`)}>查看详情</button></div>)}
-              <div className="pool-actions"><button onClick={() => showToast("已模拟关联当前批次问题")}>关联批次问题</button><button onClick={() => showToast("请选择至少两条全局问题后合并")}>合并问题</button><button onClick={() => showToast("已打开描述与截图编辑器")}>编辑描述 / 截图</button></div>
+              <div className="pool-actions"><button onClick={() => showToast("已关联当前批次问题")}>关联批次问题</button><button onClick={() => showToast("请选择至少两条全局问题后合并")}>合并问题</button><button onClick={() => showToast("已打开描述与截图编辑器")}>编辑描述 / 截图</button></div>
             </article>
           )}
-          <div className="stage-next standalone"><span>解决状态和操作日志会进入效率监测。</span><button onClick={() => setStrategyStep("monitor")}>下一步：数据监测 →</button></div>
-        </>
-      )}
+          <div className="stage-next standalone"><span>解决状态和操作日志会进入效率监测。</span><button onClick={() => scrollToSection("strategy", "strategy-monitor")}>定位到数据监测 ↓</button></div>
+      </section>
 
-      {strategyStep === "monitor" && (
-        <>
-          <section className="stage-heading"><span>STEP 04</span><div><h3>数据监测</h3><p>持续验证策略质量、问题归因结构与解决效率，形成下一轮策略输入。</p></div></section>
+      <section className="module-section strategy-module" id="strategy-monitor">
+          <ModuleHeader index="04" tag="DATA MONITORING" title="数据监测" text="从质量、归因和效率三个维度验证策略效果，并形成下一轮策略输入。" />
           <nav className="monitor-tabs">{(["quality", "attribution", "efficiency"] as MonitorView[]).map((view) => <button key={view} className={monitorView === view ? "active" : ""} onClick={() => setMonitorView(view)}>{view === "quality" ? "质量监测" : view === "attribution" ? "归因监测" : "效率监测"}<span>{view === "quality" ? "策略 + 质量指标" : view === "attribution" ? "问题结构与解决率" : "进度、逾期与状态"}</span></button>)}</nav>
           {monitorView === "quality" && (
             <>
@@ -786,39 +864,43 @@ export default function Home() {
               <section className="grid two-one"><article className="panel"><PanelTitle kicker="SOLUTION EFFICIENCY" title="解决率、逾期率与推进率" /><LineChart series={[{ name: "解决率", color: "#15a98c", values: [42, 48, 53, 57, 61, 66, 70.8] }, { name: "推进率", color: "#7357ff", values: [38, 44, 49, 55, 59, 64, 68.2] }, { name: "逾期率反向值", color: "#e16a73", values: [82, 84, 85, 87, 88, 90, 91.7] }]} /></article><article className="panel"><PanelTitle kicker="STATUS SNAPSHOT" title="三类问题状态" /><div className="status-matrix">{[["产品", 2, 3, 6], ["人审", 1, 2, 5], ["规则 / SOP", 2, 2, 3]].map(([name, pending, active, done]) => <div key={String(name)}><b>{name}</b><span><i className="wait" />待处理 {pending}</span><span><i className="doing" />处理中 {active}</span><span><i className="done" />已完成 {done}</span></div>)}</div></article></section>
             </>
           )}
-          <article className="loop-complete"><div><span>闭环回流</span><h3>监测结果将成为下一轮异常发现的策略输入</h3><p>当异常率、归因结构或解决效率偏离目标时，系统建议调整策略阈值、抽样范围或协同动作。</p></div><button onClick={() => setStrategyStep("discover")}>返回异常发现 ↗</button></article>
-        </>
-      )}
+          <article className="loop-complete"><div><span>闭环回流</span><h3>监测结果将成为下一轮异常发现的策略输入</h3><p>当异常率、归因结构或解决效率偏离目标时，系统建议调整策略阈值、抽样范围或协同动作。</p></div><button onClick={() => scrollToSection("strategy", "strategy-discover")}>返回异常发现 ↑</button></article>
+      </section>
     </>
   );
+
+  const currentModules = mainTab === "base"
+    ? baseViews.map((view, index) => ({ id: `base-${view.id}`, label: view.label, index: index + 1 }))
+    : mainTab === "quality"
+      ? qualityViews.map((view, index) => ({ id: `quality-${view.id}`, label: view.label, index: index + 1 }))
+      : strategySteps.map((step, index) => ({ id: `strategy-${step.id}`, label: step.label, index: index + 1 }));
 
   return (
     <main className="app-shell">
       <aside className="sidebar">
-        <button className="brand" onClick={() => switchMain("strategy")}><span className="brand-mark">A</span><span><b>Atlas</b><small>广告审核质量看板</small></span></button>
+        <button className="brand" onClick={() => switchMain("base")}><span className="brand-mark">A</span><span><b>Atlas</b><small>广告审核质量看板</small></span></button>
         <div className="sidebar-label">DASHBOARD</div>
         <nav className="main-nav" aria-label="主导航">
           {mainTabs.map((tab) => <button key={tab.id} className={mainTab === tab.id ? "active" : ""} onClick={() => switchMain(tab.id)}><span>{tab.index}</span><div><b>{tab.label}</b><small>{tab.desc}</small></div>{tab.id === "strategy" && <em>CORE</em>}</button>)}
         </nav>
         <div className="sidebar-flow">
-          <span>策略闭环</span>
-          {strategySteps.map((step, index) => <button key={step.id} className={mainTab === "strategy" && strategyStep === step.id ? "active" : ""} onClick={() => { setMainTab("strategy"); setStrategyStep(step.id); }}><i>{index + 1}</i>{step.label}</button>)}
+          <span>{mainTabs.find((tab) => tab.id === mainTab)?.label}板块</span>
+          {currentModules.map((module) => <button key={module.id} className={activeSection === module.id ? "active" : ""} onClick={() => scrollToSection(mainTab, module.id)}><i>{module.index}</i>{module.label}</button>)}
         </div>
-        <div className="environment"><i /><div><b>公开演示环境</b><p>虚构数据 · 不连接公司系统</p></div></div>
-        <div className="privacy-card"><span>PRIVACY SAFE</span><p>真实标签、人员、渠道、阈值与业务明细均未进入本站。</p></div>
+        <div className="environment"><i /><div><b>数据状态正常</b><p>最近更新：今天 10:42</p></div></div>
+        <div className="sidebar-summary"><span>本周任务</span><b>24</b><p>17 个问题已完成 · 2 个问题逾期</p></div>
       </aside>
 
       <section className="main-area">
         <header className="topbar">
-          <div><span>作品集 / 广告审核质量 / <b>{mainTabs.find((tab) => tab.id === mainTab)?.label}</b></span><h1>广告审核质量看板 · 脱敏演示</h1></div>
-          <div className="top-actions"><button onClick={() => showToast("已生成当前视图快照（演示）")}>导出快照</button><button onClick={resetDemo}>重置演示</button><button className="primary-button" onClick={() => setTourOpen(true)}>▶ 面试导览</button><span className="avatar">DE</span></div>
+          <div><span>广告审核质量 / <b>{mainTabs.find((tab) => tab.id === mainTab)?.label}</b></span><h1>广告审核质量看板</h1></div>
+          <div className="top-actions"><button onClick={() => showToast("当前视图已导出")}>导出当前页</button><button onClick={refreshDashboard}>刷新数据</button><span className="last-update">更新于 2 分钟前</span><span className="avatar">QS</span></div>
         </header>
-        <div className="demo-banner"><span>DEMO ONLY</span><p>本站仅复现产品结构与交互逻辑，名称、数值、样本、策略阈值均为虚构。</p><i>数据更新于 2 分钟前</i></div>
         <div className="content">
           {mainTab === "base" && renderBase()}
           {mainTab === "quality" && renderQuality()}
           {mainTab === "strategy" && renderStrategy()}
-          <footer><div><span className="brand-mark small">A</span><b>Atlas Portfolio Demo</b></div><p>广告审核质量看板 · 三类数据 · 一条改进闭环</p><span>All data is simulated</span></footer>
+          <footer><div><span className="brand-mark small">A</span><b>Atlas Quality Operations</b></div><p>广告审核质量看板</p><span>Quality · Strategy · Efficiency</span></footer>
         </div>
       </section>
 
@@ -827,28 +909,11 @@ export default function Home() {
           <section className="sample-drawer" role="dialog" aria-modal="true" aria-labelledby="sample-title">
             <header><div><span>SAMPLE EVIDENCE · DESENSITIZED</span><h2 id="sample-title">异常样本详情</h2></div><button onClick={() => setSelectedSample(null)}>×</button></header>
             <div className="sample-id"><span className="mono">{selectedSample.id}</span><em className={`risk risk-${selectedSample.risk}`}>{selectedSample.risk}风险</em></div>
-            <div className="fake-video"><div className="video-grid" /><span>▶</span><b>虚构视频预览</b><small>00:36 / {selectedSample.duration}</small></div>
+            <div className="fake-video"><div className="video-grid" /><span>▶</span><b>内容预览</b><small>00:36 / {selectedSample.duration}</small></div>
             <div className="segment-track"><span>0s</span><i><em style={{ left: "8%", width: "24%" }} /><em style={{ left: "39%", width: "17%" }} /><em style={{ left: "64%", width: "28%" }} /></i><span>{selectedSample.duration}</span></div>
-            <div className="sample-facts"><div><span>脱敏标签</span><b>{selectedSample.label}</b></div><div><span>标记组合</span><b>{selectedSample.marker}</b></div><div><span>异常信号</span><b>{strategyId === "A" ? selectedSample.signal : `${selectedSample.segments} 个片段`}</b></div><div><span>队列 / 角色</span><b>{selectedSample.channel} · {selectedSample.auditor}</b></div></div>
+            <div className="sample-facts"><div><span>标签</span><b>{selectedSample.label}</b></div><div><span>标记组合</span><b>{selectedSample.marker}</b></div><div><span>异常信号</span><b>{strategyId === "A" ? selectedSample.signal : `${selectedSample.segments} 个片段`}</b></div><div><span>队列 / 角色</span><b>{selectedSample.channel} · {selectedSample.auditor}</b></div></div>
             <div className="evidence-box"><span>判定证据</span><p>{strategyId === "A" ? "该标签在当前队列以 ASR 标记为主，本样本采用少数位置方式，且同时出现辅助信号，建议通过录屏确认操作路径。" : "同一元素、同一标签下出现多段相邻片段，数量超过策略阈值，需要区分产品重叠、合理重复或人工操作问题。"}</p></div>
             <div className="drawer-actions"><button onClick={() => setSelectedSample(null)}>关闭</button><button className="primary-button" onClick={() => { setTrackedSamples((current) => Array.from(new Set([...current, selectedSample.id]))); setSelectedSample(null); showToast("样本已加入跟台池"); }}>加入跟台池</button></div>
-          </section>
-        </div>
-      )}
-
-      {tourOpen && (
-        <div className="modal-layer tour-layer" onMouseDown={(event) => { if (event.target === event.currentTarget) setTourOpen(false); }}>
-          <section className="tour-card" role="dialog" aria-modal="true">
-            <button className="tour-close" onClick={() => setTourOpen(false)}>×</button>
-            <span className="eyebrow">INTERVIEW WALKTHROUGH · 3–5 MIN</span>
-            <h2>建议这样讲这份项目</h2>
-            <p>先用基础与质量页说明数据底座，再进入策略页完成一次“发现—定义—解决—监测”的演示。</p>
-            <div className="tour-steps">
-              <button onClick={() => { setMainTab("base"); setBaseView("overview"); setTourOpen(false); }}><span>01</span><b>基础数据</b><p>统一片段、元素、标签和标记方式口径。</p></button>
-              <button onClick={() => { setMainTab("quality"); setQualityView("metrics"); setTourOpen(false); }}><span>02</span><b>质量数据</b><p>用趋势、交叉热力和异常时长定位问题。</p></button>
-              <button onClick={() => { setMainTab("strategy"); setStrategyStep("discover"); setTourOpen(false); }}><span>03</span><b>策略闭环</b><p>抽样、跟台、聚合问题并推进解决。</p></button>
-              <button onClick={() => { setMainTab("strategy"); setStrategyStep("monitor"); setTourOpen(false); }}><span>04</span><b>效果验证</b><p>用质量、归因和效率指标验证改进。</p></button>
-            </div>
           </section>
         </div>
       )}

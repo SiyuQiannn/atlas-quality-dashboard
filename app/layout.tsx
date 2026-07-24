@@ -7,8 +7,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
   const baseUrl = `${protocol}://${host}`;
-  const title = "Atlas · 广告审核质量看板演示";
-  const description = "用于作品集展示的脱敏广告审核质量看板：基础数据、质量数据，以及从异常发现到问题解决的策略闭环。";
+  const title = "Atlas · 广告审核质量看板";
+  const description = "广告审核质量看板：基础数据、质量数据，以及从异常发现到问题解决的策略闭环。";
 
   return {
     title,
@@ -25,10 +25,10 @@ export async function generateMetadata(): Promise<Metadata> {
       locale: "zh_CN",
       images: [
         {
-          url: `${baseUrl}/og-v2.png`,
+          url: `${baseUrl}/og-v3.png`,
           width: 1536,
           height: 1024,
-          alt: "Atlas 广告审核质量看板脱敏演示",
+          alt: "Atlas 广告审核质量看板",
         },
       ],
     },
@@ -36,7 +36,7 @@ export async function generateMetadata(): Promise<Metadata> {
       card: "summary_large_image",
       title,
       description,
-      images: [`${baseUrl}/og-v2.png`],
+      images: [`${baseUrl}/og-v3.png`],
     },
   };
 }

@@ -23,23 +23,22 @@ async function render() {
   );
 }
 
-test("server-renders the privacy-safe three-tab dashboard", async () => {
+test("server-renders the three-page dashboard with base data as default", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>Atlas · 广告审核质量看板演示<\/title>/);
+  assert.match(html, /<title>Atlas · 广告审核质量看板<\/title>/);
   assert.match(html, /基础数据/);
   assert.match(html, /质量数据/);
   assert.match(html, /策略数据/);
-  assert.match(html, /异常发现/);
-  assert.match(html, /问题定义/);
-  assert.match(html, /问题解决/);
-  assert.match(html, /数据监测/);
-  assert.match(html, /DEMO ONLY/);
-  assert.match(html, /og-v2\.png/);
-  assert.doesNotMatch(html, /公司内部|真实业务数据/);
+  assert.match(html, /数据概览/);
+  assert.match(html, /标签分布分析/);
+  assert.match(html, /单元素分析/);
+  assert.match(html, /片段聚类数据/);
+  assert.match(html, /og-v3\.png/);
+  assert.doesNotMatch(html, /脱敏|演示|面试|不连接公司系统|DEMO ONLY/);
 });
 
 test("keeps all dashboard modules and social preview in the source artifact", async () => {
@@ -68,7 +67,8 @@ test("keeps all dashboard modules and social preview in the source artifact", as
     assert.match(page, new RegExp(label));
   }
 
-  assert.match(page, /所有数据均|虚构数据|名称、数值、样本、策略阈值均为虚构/);
   assert.match(layout, /广告审核质量看板/);
-  assert.match(layout, /og-v2\.png/);
+  assert.match(layout, /og-v3\.png/);
+  assert.doesNotMatch(page, /脱敏|演示|面试|不连接公司系统|DEMO ONLY/);
+  assert.doesNotMatch(layout, /脱敏|演示|面试|作品集/);
 });
