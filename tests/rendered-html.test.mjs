@@ -69,6 +69,12 @@ test("keeps all dashboard modules and social preview in the source artifact", as
 
   assert.match(layout, /广告审核质量看板/);
   assert.match(layout, /og-v3\.png/);
+  assert.match(page, /strategyStep === "discover"/);
+  assert.match(page, /strategyStep === "define"/);
+  assert.match(page, /strategyStep === "solve"/);
+  assert.match(page, /strategyStep === "monitor"/);
+  assert.match(page, /dashboard-view/);
+  assert.doesNotMatch(page, /intro-stat|loop-badge|activeSection|scrollToSection|DESENSITIZED/);
   assert.doesNotMatch(page, /脱敏|演示|面试|不连接公司系统|DEMO ONLY/);
   assert.doesNotMatch(layout, /脱敏|演示|面试|作品集/);
 });

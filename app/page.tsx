@@ -308,7 +308,9 @@ function ModuleHeader({
 
 export default function Home() {
   const [mainTab, setMainTab] = useState<MainTab>("base");
-  const [activeSection, setActiveSection] = useState("base-overview");
+  const [baseView, setBaseView] = useState<BaseView>("overview");
+  const [qualityView, setQualityView] = useState<QualityView>("metrics");
+  const [strategyStep, setStrategyStep] = useState<StrategyStep>("discover");
   const [monitorView, setMonitorView] = useState<MonitorView>("quality");
   const [strategyId, setStrategyId] = useState<StrategyId>("A");
   const [metricKey, setMetricKey] = useState<keyof typeof qualityMetrics>("iou");
@@ -358,34 +360,16 @@ export default function Home() {
 
   const switchMain = (tab: MainTab) => {
     setMainTab(tab);
-    setActiveSection(tab === "base" ? "base-overview" : tab === "quality" ? "quality-metrics" : "strategy-discover");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const scrollToSection = (tab: MainTab, id: string) => {
+  const selectModule = (tab: MainTab, id: string) => {
     setMainTab(tab);
-    setActiveSection(id);
-    window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 30);
+    if (tab === "base") setBaseView(id.replace("base-", "") as BaseView);
+    if (tab === "quality") setQualityView(id.replace("quality-", "") as QualityView);
+    if (tab === "strategy") setStrategyStep(id.replace("strategy-", "") as StrategyStep);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
-
-  useEffect(() => {
-    const ids = mainTab === "base"
-      ? ["base-overview", "base-labels", "base-element", "base-cluster"]
-      : mainTab === "quality"
-        ? ["quality-metrics", "quality-duration"]
-        : ["strategy-discover", "strategy-define", "strategy-solve", "strategy-monitor"];
-    const sections = ids.map((id) => document.getElementById(id)).filter(Boolean) as HTMLElement[];
-    if (!sections.length) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (visible?.target.id) setActiveSection(visible.target.id);
-      },
-      { rootMargin: "-18% 0px -66% 0px", threshold: [0.05, 0.25, 0.5] },
-    );
-    sections.forEach((section) => observer.observe(section));
-    return () => observer.disconnect();
-  }, [mainTab]);
 
   const updateDefinition = (sampleId: string, patch: Partial<Definition>) => {
     setDefinitions((current) => ({
@@ -415,7 +399,9 @@ export default function Home() {
 
   const refreshDashboard = () => {
     setMainTab("base");
-    setActiveSection("base-overview");
+    setBaseView("overview");
+    setQualityView("metrics");
+    setStrategyStep("discover");
     setStrategyId("A");
     setCheckedSamples(["S-2407-01", "S-2407-02", "S-2407-03", "S-2407-04"]);
     setTrackedSamples(["S-2407-01", "S-2407-02", "S-2407-03", "S-2407-04"]);
@@ -433,21 +419,20 @@ export default function Home() {
           <h2>基础数据</h2>
           <p>片段、元素、标签及标记方式的全量统计与分布分析。</p>
         </div>
-        <div className="intro-stat"><b>68.8<small>万</small></b><span>本周期片段记录</span></div>
       </section>
 
       <nav className="module-directory" aria-label="基础数据板块">
         <header><span>PAGE INDEX</span><b>基础数据板块</b></header>
         {baseViews.map((view) => (
-          <button key={view.id} className={activeSection === `base-${view.id}` ? "active" : ""} onClick={() => scrollToSection("base", `base-${view.id}`)}>
-            <i>{String(baseViews.findIndex((item) => item.id === view.id) + 1).padStart(2, "0")}</i><b>{view.label}</b><span>{view.hint}</span><em>↓</em>
+          <button key={view.id} className={baseView === view.id ? "active" : ""} onClick={() => selectModule("base", `base-${view.id}`)}>
+            <i>{String(baseViews.findIndex((item) => item.id === view.id) + 1).padStart(2, "0")}</i><b>{view.label}</b><span>{view.hint}</span><em>→</em>
           </button>
         ))}
       </nav>
 
       <Filters period={period} setPeriod={setPeriod} team={team} setTeam={setTeam} channel={channel} setChannel={setChannel} label={label} setLabel={setLabel} />
 
-      <section className="module-section" id="base-overview">
+      <section className={`module-section dashboard-view ${baseView === "overview" ? "active-view" : ""}`} id="base-overview">
         <ModuleHeader index="01" tag="DATA OVERVIEW" title="数据概览" text="汇总片段规模、元素规模、标记方式构成与标签/队列维度表现。" />
           <section className="metric-grid five">
             <MetricCard label="标记片段数" value="68.8万" delta="+8.4%" detail="环比上周期" tone="ink" />
@@ -490,7 +475,7 @@ export default function Home() {
                   {baseRows.map((row) => (
                     <tr key={row.label}>
                       <td><b>{row.label}</b></td><td><span className="soft-pill">{row.channel}</span></td><td>{number(row.segments)}</td><td>{number(row.manual)}</td><td>{number(row.asr)}</td><td>{row.frame} / {row.ocr}</td>
-                      <td><div className="split-bar" title="ASR / 手打"><i style={{ width: `${(row.asr / row.segments) * 100}%` }} /><b /></div></td><td>{number(row.elements)}</td><td><button className="link-button" onClick={() => { setStrategyId("A"); scrollToSection("strategy", "strategy-discover"); }}>少数分布样本 →</button></td>
+                      <td><div className="split-bar" title="ASR / 手打"><i style={{ width: `${(row.asr / row.segments) * 100}%` }} /><b /></div></td><td>{number(row.elements)}</td><td><button className="link-button" onClick={() => { setStrategyId("A"); selectModule("strategy", "strategy-discover"); }}>少数分布样本 →</button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -499,7 +484,7 @@ export default function Home() {
           </article>
       </section>
 
-      <section className="module-section" id="base-labels">
+      <section className={`module-section dashboard-view ${baseView === "labels" ? "active-view" : ""}`} id="base-labels">
         <ModuleHeader index="02" tag="LABEL DISTRIBUTION" title="标签分布分析" text="识别 ASR 主导、手打主导与无明显分布标签，追踪周期迁移与队列差异。" />
           <section className="metric-grid three">
             <MetricCard label="ASR 主导标签" value="62" delta="+4" detail="主导占比 ≥ 70%" />
@@ -540,7 +525,7 @@ export default function Home() {
           </article>
       </section>
 
-      <section className="module-section" id="base-element">
+      <section className={`module-section dashboard-view ${baseView === "element" ? "active-view" : ""}`} id="base-element">
         <ModuleHeader index="03" tag="SINGLE ELEMENT" title="单元素分析" text="基于均值、最大值与均值 + 2σ 阈值识别多片段异常元素并下钻明细。" />
           <section className="metric-grid four">
             <MetricCard label="平均片段数" value="1.72" delta="+0.08" detail="每个元素" />
@@ -568,12 +553,12 @@ export default function Home() {
           <article className="panel table-panel">
             <PanelTitle kicker="OUTLIER LIST" title="异常元素明细" text="点击策略入口可带入当前元素和标签条件。" />
             <div className="table-wrap"><table><thead><tr><th>元素 ID</th><th>标签</th><th>片段数</th><th>标签均值</th><th>偏离</th><th>类型</th><th>状态</th><th /></tr></thead><tbody>
-              {elementRows.map((row) => <tr key={row.id}><td className="mono">{row.id}</td><td>{row.label}</td><td><b>{row.segments}</b></td><td>{row.average}</td><td className="danger-text">{row.deviation}</td><td>{row.type}</td><td><span className={`risk risk-${row.status}`}>{row.status}</span></td><td><button className="link-button" onClick={() => { setStrategyId("B"); scrollToSection("strategy", "strategy-discover"); }}>进入策略 →</button></td></tr>)}
+              {elementRows.map((row) => <tr key={row.id}><td className="mono">{row.id}</td><td>{row.label}</td><td><b>{row.segments}</b></td><td>{row.average}</td><td className="danger-text">{row.deviation}</td><td>{row.type}</td><td><span className={`risk risk-${row.status}`}>{row.status}</span></td><td><button className="link-button" onClick={() => { setStrategyId("B"); selectModule("strategy", "strategy-discover"); }}>进入策略 →</button></td></tr>)}
             </tbody></table></div>
           </article>
       </section>
 
-      <section className="module-section" id="base-cluster">
+      <section className={`module-section dashboard-view ${baseView === "cluster" ? "active-view" : ""}`} id="base-cluster">
         <ModuleHeader index="04" tag="SEGMENT CLUSTER" title="片段聚类数据" text="分别查看 ASR 与手打片段的时长分布，并支持自定义区间生成聚类结果。" />
         <section className="grid equal">
           <article className="panel">
@@ -619,15 +604,14 @@ export default function Home() {
     <>
       <section className="page-intro quality-intro">
         <div><span className="eyebrow">QUALITY DATA</span><h2>质量数据</h2><p>一审与质检结果对比、核心质量指标及异常时长片段统计。</p></div>
-        <div className="intro-stat"><b>6.3<small>万</small></b><span>本周期质检对比记录</span></div>
       </section>
       <nav className="module-directory compact" aria-label="质量数据板块">
         <header><span>PAGE INDEX</span><b>质量数据板块</b></header>
-        {qualityViews.map((view) => <button key={view.id} className={activeSection === `quality-${view.id}` ? "active" : ""} onClick={() => scrollToSection("quality", `quality-${view.id}`)}><i>{String(qualityViews.findIndex((item) => item.id === view.id) + 1).padStart(2, "0")}</i><b>{view.label}</b><span>{view.hint}</span><em>↓</em></button>)}
+        {qualityViews.map((view) => <button key={view.id} className={qualityView === view.id ? "active" : ""} onClick={() => selectModule("quality", `quality-${view.id}`)}><i>{String(qualityViews.findIndex((item) => item.id === view.id) + 1).padStart(2, "0")}</i><b>{view.label}</b><span>{view.hint}</span><em>→</em></button>)}
       </nav>
       <Filters period={period} setPeriod={setPeriod} team={team} setTeam={setTeam} channel={channel} setChannel={setChannel} label={label} setLabel={setLabel} />
 
-      <section className="module-section" id="quality-metrics">
+      <section className={`module-section dashboard-view ${qualityView === "metrics" ? "active-view" : ""}`} id="quality-metrics">
         <ModuleHeader index="01" tag="QUALITY METRICS" title="质量指标" text="观察 IoU、正确打标率、标签匹配度、段落精准率、综合准确率、重复差异与极端短耗时。" />
           <div className="metric-selector">
             {Object.entries(qualityMetrics).map(([key, metric]) => <button key={key} className={metricKey === key ? "active" : ""} onClick={() => setMetricKey(key as keyof typeof qualityMetrics)}><span>{metric.label}</span><b>{metric.value}</b><em>{metric.delta}</em></button>)}
@@ -688,7 +672,7 @@ export default function Home() {
           </article>
       </section>
 
-      <section className="module-section" id="quality-duration">
+      <section className={`module-section dashboard-view ${qualityView === "duration" ? "active-view" : ""}`} id="quality-duration">
         <ModuleHeader index="02" tag="ABNORMAL DURATION" title="异常时长片段统计" text="统计超长、超短片段，并结合标签属性区分合理与不合理案例。" />
           <section className="metric-grid four">
             <MetricCard label="异常时长片段" value="3,284" delta="-6.8%" detail="过长 + 过短" tone="ink" />
@@ -725,7 +709,6 @@ export default function Home() {
     <>
       <section className="page-intro strategy-intro">
         <div><span className="eyebrow">STRATEGY DATA</span><h2>策略数据</h2><p>异常发现、问题定义、问题解决与数据监测的全流程管理。</p></div>
-        <div className="loop-badge"><span>闭环完成率</span><b>78.6%</b><i><em /></i><small>本周 +9.4pp</small></div>
       </section>
 
       <div className="strategy-toolbar">
@@ -736,7 +719,7 @@ export default function Home() {
 
       <nav className="strategy-stepper" aria-label="策略闭环步骤">
         {strategySteps.map((step, index) => (
-          <button key={step.id} className={activeSection === `strategy-${step.id}` ? "active" : ""} onClick={() => scrollToSection("strategy", `strategy-${step.id}`)}>
+          <button key={step.id} className={strategyStep === step.id ? "active" : ""} onClick={() => selectModule("strategy", `strategy-${step.id}`)}>
             <span>{step.index}</span><div><b>{step.label}</b><small>{step.hint}</small></div>{index < strategySteps.length - 1 && <i>→</i>}
           </button>
         ))}
@@ -748,7 +731,7 @@ export default function Home() {
         <div><span>本批命中</span><b>{strategyCopy[strategyId].hits}</b></div>
       </section>
 
-      <section className="module-section strategy-module" id="strategy-discover">
+      <section className={`module-section dashboard-view strategy-module ${strategyStep === "discover" ? "active-view" : ""}`} id="strategy-discover">
           <ModuleHeader index="01" tag="ANOMALY DISCOVERY" title="异常发现" text="创建分析批次、运行策略、定位异常标签或元素，并抽取跟台样本。" />
           <section className="stage-heading compact-heading"><div><h3>批次与样本</h3><p>先固化分析批次，再运行策略并抽取可跟台样本。</p></div><button className="quiet-button" onClick={() => showToast("已创建批次 B-2407-W5")}>＋ 新建批次</button></section>
           <article className="panel batch-panel">
@@ -774,11 +757,11 @@ export default function Home() {
             <div className="table-wrap"><table><thead><tr><th><input type="checkbox" checked={checkedSamples.length === strategySamples.length} onChange={(event) => setCheckedSamples(event.target.checked ? strategySamples.map((sample) => sample.id) : [])} /></th><th>样本 ID</th><th>标签</th><th>队列 / 审核员</th><th>异常信号</th><th>标记组合</th><th>片段数</th><th>风险</th><th /></tr></thead><tbody>
               {strategySamples.map((sample) => <tr key={sample.id}><td><input type="checkbox" checked={checkedSamples.includes(sample.id)} onChange={(event) => setCheckedSamples((current) => event.target.checked ? [...current, sample.id] : current.filter((id) => id !== sample.id))} /></td><td className="mono">{sample.id}</td><td>{sample.label}</td><td><b>{sample.channel}</b><small className="cell-note">{sample.auditor}</small></td><td>{strategyId === "A" ? sample.signal : `${sample.segments} 个片段 / 元素`}</td><td><span className="soft-pill">{sample.marker}</span></td><td>{sample.segments}</td><td><span className={`risk risk-${sample.risk}`}>{sample.risk}</span></td><td><button className="link-button" onClick={() => setSelectedSample(sample)}>查看样本</button></td></tr>)}
             </tbody></table></div>
-            <div className="stage-next"><span>已加入跟台池 {trackedSamples.length} 条</span><button onClick={() => scrollToSection("strategy", "strategy-define")}>定位到问题定义 ↓</button></div>
+            <div className="stage-next"><span>已加入跟台池 {trackedSamples.length} 条</span><button onClick={() => selectModule("strategy", "strategy-define")}>进入问题定义 →</button></div>
           </article>
       </section>
 
-      <section className="module-section strategy-module" id="strategy-define">
+      <section className={`module-section dashboard-view strategy-module ${strategyStep === "define" ? "active-view" : ""}`} id="strategy-define">
           <ModuleHeader index="02" tag="PROBLEM DEFINITION" title="问题定义" text="核对录屏、完成问题分类与跟台记录，相同记录自动聚合为同一个问题。" />
           <section className="stage-heading compact-heading"><div><h3>跟台与归因</h3><p>支持在线填写，也支持下载模板后由团队回传。</p></div><div className="heading-actions"><button className="quiet-button" onClick={() => showToast("问题定义模板已下载")}>↓ 下载模板</button><button className="quiet-button" onClick={() => showToast("文件校验通过，内容已回传")}>↑ 回传 Excel</button></div></section>
           <section className="grid two-one define-summary">
@@ -804,11 +787,11 @@ export default function Home() {
           <article className="panel submission-history">
             <PanelTitle kicker="VERSION TIMELINE" title="提交版本与快照" text="每次提交都会保存全部样本的定义，可撤回后继续修改。" />
             <div className="version-line">{submissions.map((submission, index) => <div key={submission.id}><i className={index === submissions.length - 1 ? "current" : ""} /><span>{submission.time}</span><b>{submission.note}</b><p>{submission.count} 条完成归因</p><button onClick={() => showToast(index === submissions.length - 1 ? "当前版本无需切换" : `已预览第 ${submission.id} 版快照`)}>{index === submissions.length - 1 ? "当前版本" : "查看快照"}</button></div>)}</div>
-            <div className="stage-next"><span>问题定义完成后，按“问题”而不是按“样本”推进解决。</span><button onClick={() => scrollToSection("strategy", "strategy-solve")}>定位到问题解决 ↓</button></div>
+            <div className="stage-next"><span>问题定义完成后，按“问题”而不是按“样本”推进解决。</span><button onClick={() => selectModule("strategy", "strategy-solve")}>进入问题解决 →</button></div>
           </article>
       </section>
 
-      <section className="module-section strategy-module" id="strategy-solve">
+      <section className={`module-section dashboard-view strategy-module ${strategyStep === "solve" ? "active-view" : ""}`} id="strategy-solve">
           <ModuleHeader index="03" tag="PROBLEM RESOLUTION" title="问题解决" text="按聚合问题推进解决状态，管理 DDL、撤回、放弃与跨批次全局问题。" />
           <section className="stage-heading compact-heading"><div><h3>问题推进</h3><p>产品、规则、SOP 类问题进入协同链路；人审问题进入宣讲或扣分链路。</p></div></section>
           <div className="solution-tabs"><button className={solutionTab === "batch" ? "active" : ""} onClick={() => setSolutionTab("batch")}>本批次问题 <span>{problems.length}</span></button><button className={solutionTab === "global" ? "active" : ""} onClick={() => setSolutionTab("global")}>全局问题池 <span>3</span></button></div>
@@ -840,10 +823,10 @@ export default function Home() {
               <div className="pool-actions"><button onClick={() => showToast("已关联当前批次问题")}>关联批次问题</button><button onClick={() => showToast("请选择至少两条全局问题后合并")}>合并问题</button><button onClick={() => showToast("已打开描述与截图编辑器")}>编辑描述 / 截图</button></div>
             </article>
           )}
-          <div className="stage-next standalone"><span>解决状态和操作日志会进入效率监测。</span><button onClick={() => scrollToSection("strategy", "strategy-monitor")}>定位到数据监测 ↓</button></div>
+          <div className="stage-next standalone"><span>解决状态和操作日志会进入效率监测。</span><button onClick={() => selectModule("strategy", "strategy-monitor")}>进入数据监测 →</button></div>
       </section>
 
-      <section className="module-section strategy-module" id="strategy-monitor">
+      <section className={`module-section dashboard-view strategy-module ${strategyStep === "monitor" ? "active-view" : ""}`} id="strategy-monitor">
           <ModuleHeader index="04" tag="DATA MONITORING" title="数据监测" text="从质量、归因和效率三个维度验证策略效果，并形成下一轮策略输入。" />
           <nav className="monitor-tabs">{(["quality", "attribution", "efficiency"] as MonitorView[]).map((view) => <button key={view} className={monitorView === view ? "active" : ""} onClick={() => setMonitorView(view)}>{view === "quality" ? "质量监测" : view === "attribution" ? "归因监测" : "效率监测"}<span>{view === "quality" ? "策略 + 质量指标" : view === "attribution" ? "问题结构与解决率" : "进度、逾期与状态"}</span></button>)}</nav>
           {monitorView === "quality" && (
@@ -864,7 +847,7 @@ export default function Home() {
               <section className="grid two-one"><article className="panel"><PanelTitle kicker="SOLUTION EFFICIENCY" title="解决率、逾期率与推进率" /><LineChart series={[{ name: "解决率", color: "#15a98c", values: [42, 48, 53, 57, 61, 66, 70.8] }, { name: "推进率", color: "#7357ff", values: [38, 44, 49, 55, 59, 64, 68.2] }, { name: "逾期率反向值", color: "#e16a73", values: [82, 84, 85, 87, 88, 90, 91.7] }]} /></article><article className="panel"><PanelTitle kicker="STATUS SNAPSHOT" title="三类问题状态" /><div className="status-matrix">{[["产品", 2, 3, 6], ["人审", 1, 2, 5], ["规则 / SOP", 2, 2, 3]].map(([name, pending, active, done]) => <div key={String(name)}><b>{name}</b><span><i className="wait" />待处理 {pending}</span><span><i className="doing" />处理中 {active}</span><span><i className="done" />已完成 {done}</span></div>)}</div></article></section>
             </>
           )}
-          <article className="loop-complete"><div><span>闭环回流</span><h3>监测结果将成为下一轮异常发现的策略输入</h3><p>当异常率、归因结构或解决效率偏离目标时，系统建议调整策略阈值、抽样范围或协同动作。</p></div><button onClick={() => scrollToSection("strategy", "strategy-discover")}>返回异常发现 ↑</button></article>
+          <article className="loop-complete"><div><span>闭环回流</span><h3>监测结果将成为下一轮异常发现的策略输入</h3><p>当异常率、归因结构或解决效率偏离目标时，系统建议调整策略阈值、抽样范围或协同动作。</p></div><button onClick={() => selectModule("strategy", "strategy-discover")}>开始下一轮 ↗</button></article>
       </section>
     </>
   );
@@ -874,6 +857,11 @@ export default function Home() {
     : mainTab === "quality"
       ? qualityViews.map((view, index) => ({ id: `quality-${view.id}`, label: view.label, index: index + 1 }))
       : strategySteps.map((step, index) => ({ id: `strategy-${step.id}`, label: step.label, index: index + 1 }));
+  const activeModuleId = mainTab === "base"
+    ? `base-${baseView}`
+    : mainTab === "quality"
+      ? `quality-${qualityView}`
+      : `strategy-${strategyStep}`;
 
   return (
     <main className="app-shell">
@@ -885,7 +873,7 @@ export default function Home() {
         </nav>
         <div className="sidebar-flow">
           <span>{mainTabs.find((tab) => tab.id === mainTab)?.label}板块</span>
-          {currentModules.map((module) => <button key={module.id} className={activeSection === module.id ? "active" : ""} onClick={() => scrollToSection(mainTab, module.id)}><i>{module.index}</i>{module.label}</button>)}
+          {currentModules.map((module) => <button key={module.id} className={activeModuleId === module.id ? "active" : ""} onClick={() => selectModule(mainTab, module.id)}><i>{module.index}</i>{module.label}</button>)}
         </div>
         <div className="environment"><i /><div><b>数据状态正常</b><p>最近更新：今天 10:42</p></div></div>
         <div className="sidebar-summary"><span>本周任务</span><b>24</b><p>17 个问题已完成 · 2 个问题逾期</p></div>
@@ -907,7 +895,7 @@ export default function Home() {
       {selectedSample && (
         <div className="modal-layer" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedSample(null); }}>
           <section className="sample-drawer" role="dialog" aria-modal="true" aria-labelledby="sample-title">
-            <header><div><span>SAMPLE EVIDENCE · DESENSITIZED</span><h2 id="sample-title">异常样本详情</h2></div><button onClick={() => setSelectedSample(null)}>×</button></header>
+            <header><div><span>SAMPLE EVIDENCE</span><h2 id="sample-title">异常样本详情</h2></div><button onClick={() => setSelectedSample(null)}>×</button></header>
             <div className="sample-id"><span className="mono">{selectedSample.id}</span><em className={`risk risk-${selectedSample.risk}`}>{selectedSample.risk}风险</em></div>
             <div className="fake-video"><div className="video-grid" /><span>▶</span><b>内容预览</b><small>00:36 / {selectedSample.duration}</small></div>
             <div className="segment-track"><span>0s</span><i><em style={{ left: "8%", width: "24%" }} /><em style={{ left: "39%", width: "17%" }} /><em style={{ left: "64%", width: "28%" }} /></i><span>{selectedSample.duration}</span></div>
