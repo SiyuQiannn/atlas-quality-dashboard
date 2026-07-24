@@ -2,102 +2,147 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-type Period = "7d" | "30d" | "q";
-type ViewMode = "trend" | "mix";
-type DrawerRow = (typeof anomalyRows)[number];
+type MainTab = "base" | "quality" | "strategy";
+type BaseView = "overview" | "labels" | "element" | "cluster";
+type QualityView = "metrics" | "duration";
+type StrategyStep = "discover" | "define" | "solve" | "monitor";
+type MonitorView = "quality" | "attribution" | "efficiency";
+type StrategyId = "A" | "B";
+type Sample = (typeof strategySamples)[number];
+type Definition = { viewed: boolean; category: string; record: string };
+type ChartSeries = { name: string; color: string; values: number[] };
 
-const periods: Array<{ key: Period; label: string }> = [
-  { key: "7d", label: "近 7 天" },
-  { key: "30d", label: "近 30 天" },
-  { key: "q", label: "本季度" },
+const mainTabs: Array<{ id: MainTab; index: string; label: string; desc: string }> = [
+  { id: "base", index: "01", label: "基础数据", desc: "规模与分布" },
+  { id: "quality", index: "02", label: "质量数据", desc: "准确与差异" },
+  { id: "strategy", index: "03", label: "策略数据", desc: "发现到解决" },
 ];
 
-const scopeOptions = ["全量队列", "队列 A", "队列 B", "队列 C"];
+const baseViews: Array<{ id: BaseView; label: string; hint: string }> = [
+  { id: "overview", label: "数据概览", hint: "规模、信号与维度" },
+  { id: "labels", label: "标签分布分析", hint: "主导类型与迁移" },
+  { id: "element", label: "单元素分析", hint: "多片段异常" },
+  { id: "cluster", label: "片段聚类数据", hint: "时长与区间" },
+];
 
-const periodData = {
-  "7d": {
-    volume: 48260,
-    coverage: 93.8,
-    quality: 88.6,
-    efficiency: 34.2,
-    trend: [84.8, 86.2, 85.6, 87.9, 87.3, 89.1, 88.6],
-    labels: ["07/18", "07/19", "07/20", "07/21", "07/22", "07/23", "07/24"],
+const qualityViews: Array<{ id: QualityView; label: string; hint: string }> = [
+  { id: "metrics", label: "质量指标", hint: "趋势、热力与差错" },
+  { id: "duration", label: "异常时长片段", hint: "过长、过短与合理性" },
+];
+
+const strategySteps: Array<{ id: StrategyStep; index: string; label: string; hint: string }> = [
+  { id: "discover", index: "01", label: "异常发现", hint: "建批次 · 跑策略 · 捞样本" },
+  { id: "define", index: "02", label: "问题定义", hint: "看录屏 · 归因 · 提交快照" },
+  { id: "solve", index: "03", label: "问题解决", hint: "聚合问题 · 推进 · 沉淀" },
+  { id: "monitor", index: "04", label: "数据监测", hint: "质量 · 归因 · 效率" },
+];
+
+const labels7d = ["07/18", "07/19", "07/20", "07/21", "07/22", "07/23", "07/24"];
+
+const baseRows = [
+  { label: "标签组 A-01", channel: "队列 02", segments: 12840, manual: 4780, asr: 8060, frame: 182, ocr: 314, elements: 6210 },
+  { label: "标签组 B-04", channel: "队列 01", segments: 10926, manual: 3933, asr: 6993, frame: 96, ocr: 205, elements: 5748 },
+  { label: "标签组 C-02", channel: "队列 04", segments: 8942, manual: 5044, asr: 3898, frame: 135, ocr: 278, elements: 4316 },
+  { label: "标签组 A-07", channel: "队列 03", segments: 7816, manual: 2110, asr: 5706, frame: 72, ocr: 116, elements: 3982 },
+  { label: "标签组 D-03", channel: "队列 02", segments: 6690, manual: 3712, asr: 2978, frame: 54, ocr: 147, elements: 3481 },
+];
+
+const labelGroups = [
+  { label: "标签组 A-01", kind: "ASR 主导", current: 81, previous: 74, volume: 12840 },
+  { label: "标签组 B-04", kind: "ASR 主导", current: 76, previous: 79, volume: 10926 },
+  { label: "标签组 C-02", kind: "手打主导", current: 72, previous: 61, volume: 8942 },
+  { label: "标签组 D-03", kind: "手打主导", current: 70, previous: 73, volume: 6690 },
+  { label: "标签组 A-07", kind: "无明显分布", current: 58, previous: 69, volume: 7816 },
+  { label: "标签组 E-05", kind: "无明显分布", current: 54, previous: 48, volume: 5240 },
+];
+
+const elementRows = [
+  { id: "EL-DEMO-017", label: "标签组 A-01", segments: 9, average: 1.8, deviation: "+4.2σ", type: "ASR", status: "高风险" },
+  { id: "EL-DEMO-084", label: "标签组 C-02", segments: 7, average: 1.6, deviation: "+3.7σ", type: "手打", status: "高风险" },
+  { id: "EL-DEMO-126", label: "标签组 B-04", segments: 6, average: 1.5, deviation: "+3.1σ", type: "ASR", status: "关注" },
+  { id: "EL-DEMO-203", label: "标签组 D-03", segments: 5, average: 1.7, deviation: "+2.4σ", type: "手打", status: "关注" },
+  { id: "EL-DEMO-271", label: "标签组 A-07", segments: 4, average: 1.4, deviation: "+2.1σ", type: "ASR", status: "观察" },
+];
+
+const qualityMetrics = {
+  iou: { label: "IoU", value: "86.4%", delta: "+2.1%", color: "#7357ff", values: [80.2, 82.8, 81.9, 84.6, 85.1, 87.2, 86.4] },
+  correct: { label: "正确打标率", value: "92.7%", delta: "+1.3%", color: "#15a98c", values: [89.1, 89.8, 90.6, 91.2, 91.0, 92.1, 92.7] },
+  match: { label: "标签匹配度", value: "94.1%", delta: "+0.8%", color: "#3687e8", values: [91.8, 92.4, 92.1, 93.0, 93.4, 93.7, 94.1] },
+  precision: { label: "段落精准率", value: "88.9%", delta: "+1.7%", color: "#f0a33a", values: [84.3, 85.8, 86.6, 87.1, 86.9, 88.2, 88.9] },
+  accuracy: { label: "综合准确率", value: "90.8%", delta: "+1.5%", color: "#d85d84", values: [86.9, 87.6, 88.4, 88.1, 89.3, 90.2, 90.8] },
+  repeat: { label: "简单重复差异", value: "1.8%", delta: "-0.6%", color: "#7c889d", values: [3.8, 3.4, 3.1, 2.9, 2.6, 2.2, 1.8] },
+  fast: { label: "极端短耗时占比", value: "2.4%", delta: "-0.4%", color: "#e46c5f", values: [4.3, 4.0, 3.8, 3.1, 3.2, 2.7, 2.4] },
+};
+
+const heatmap = [
+  [94, 91, 89, 93],
+  [92, 86, 90, 88],
+  [89, 84, 87, 91],
+  [93, 88, 92, 85],
+];
+
+const durationRows = [
+  { id: "DUR-0241", label: "标签组 C-02", channel: "队列 04", type: "超长", duration: "148s / 152s", ratio: "97.4%", reason: "不合理", count: 8 },
+  { id: "DUR-0318", label: "标签组 A-01", channel: "队列 02", type: "超短", duration: "1.1s / 96s", ratio: "1.1%", reason: "不合理", count: 6 },
+  { id: "DUR-0412", label: "标签组 E-05", channel: "队列 01", type: "超长", duration: "84s / 88s", ratio: "95.5%", reason: "合理", count: 5 },
+  { id: "DUR-0527", label: "标签组 B-04", channel: "队列 03", type: "超短", duration: "1.8s / 43s", ratio: "4.2%", reason: "合理", count: 4 },
+  { id: "DUR-0684", label: "标签组 D-03", channel: "队列 02", type: "超长", duration: "202s / 211s", ratio: "95.7%", reason: "不合理", count: 3 },
+];
+
+const strategySamples = [
+  { id: "S-2407-01", label: "标签组 A-03", auditor: "演示审核员 02", channel: "队列 02", signal: "ASR 少数位置", marker: "ASR + 片段", duration: "02:14", segments: 5, risk: "高" },
+  { id: "S-2407-02", label: "标签组 A-03", auditor: "演示审核员 07", channel: "队列 04", signal: "手打少数位置", marker: "片段 + OCR", duration: "01:48", segments: 4, risk: "中" },
+  { id: "S-2407-03", label: "标签组 C-08", auditor: "演示审核员 04", channel: "队列 02", signal: "ASR 少数位置", marker: "ASR + 视频帧", duration: "03:06", segments: 6, risk: "高" },
+  { id: "S-2407-04", label: "标签组 D-02", auditor: "演示审核员 11", channel: "队列 01", signal: "手打少数位置", marker: "片段", duration: "00:54", segments: 3, risk: "中" },
+  { id: "S-2407-05", label: "标签组 B-06", auditor: "演示审核员 09", channel: "队列 03", signal: "ASR 少数位置", marker: "ASR + OCR", duration: "02:31", segments: 4, risk: "低" },
+  { id: "S-2407-06", label: "标签组 E-01", auditor: "演示审核员 13", channel: "队列 04", signal: "手打少数位置", marker: "片段 + 视频帧", duration: "01:21", segments: 5, risk: "高" },
+];
+
+const initialDefinitions: Record<string, Definition> = {
+  "S-2407-01": { viewed: true, category: "产品问题", record: "识别信号未在复核视图中完整展开" },
+  "S-2407-02": { viewed: true, category: "人审执行问题", record: "未按操作顺序展开信号后再选择片段" },
+  "S-2407-03": { viewed: false, category: "产品问题", record: "识别信号未在复核视图中完整展开" },
+  "S-2407-04": { viewed: true, category: "规则问题", record: "当前规则对组合信号的优先级描述不明确" },
+};
+
+const problemCategories = ["产品问题", "人审执行问题", "人审理解问题", "规则问题", "SOP 不清晰", "SOP / 规则变更", "无问题"];
+
+const quickTemplates = [
+  { category: "产品问题", record: "识别信号未在复核视图中完整展开" },
+  { category: "人审执行问题", record: "未按操作顺序展开信号后再选择片段" },
+  { category: "人审理解问题", record: "对多信号并存时的标记优先级理解有偏差" },
+  { category: "规则问题", record: "当前规则对组合信号的优先级描述不明确" },
+];
+
+const strategyCopy = {
+  A: {
+    title: "策略 A · 少数位置分布",
+    summary: "识别与标签主导标记方式相反的少数样本，定位不稳定的审核行为。",
+    rule: "标签样本量 ≥ 20，主导方式占比 ≥ 70%，抽取相反方式样本",
+    hits: "12 个异常标签 · 86 条候选样本",
   },
-  "30d": {
-    volume: 186420,
-    coverage: 92.4,
-    quality: 87.9,
-    efficiency: 35.8,
-    trend: [82.1, 82.8, 83.7, 84.1, 83.9, 85.4, 86.2, 86.8, 87.1, 87.9],
-    labels: ["06/25", "06/28", "07/01", "07/04", "07/07", "07/10", "07/14", "07/18", "07/21", "07/24"],
-  },
-  q: {
-    volume: 518900,
-    coverage: 89.7,
-    quality: 85.4,
-    efficiency: 39.1,
-    trend: [78.2, 79.4, 80.8, 81.2, 82.7, 83.1, 84.0, 84.7, 85.0, 85.4],
-    labels: ["05/01", "05/10", "05/20", "06/01", "06/10", "06/20", "07/01", "07/10", "07/18", "07/24"],
+  B: {
+    title: "策略 B · 多片段异常",
+    summary: "识别同元素、同标签下片段数量显著偏高的案例，区分产品与人审问题。",
+    rule: "同元素 + 同标签，片段数 > 3，并排除已确认的合理重复",
+    hits: "18 个异常元素 · 64 条候选样本",
   },
 };
 
-const scopeTuning: Record<string, { volume: number; score: number; time: number }> = {
-  全量队列: { volume: 1, score: 0, time: 0 },
-  "队列 A": { volume: 0.38, score: 1.8, time: -2.1 },
-  "队列 B": { volume: 0.34, score: -2.6, time: 3.4 },
-  "队列 C": { volume: 0.28, score: 0.7, time: -0.6 },
-};
-
-const issueMix = [
-  { label: "边界偏移", count: 428, pct: 38, tone: "violet" },
-  { label: "信号缺失", count: 316, pct: 28, tone: "cyan" },
-  { label: "规则冲突", count: 247, pct: 22, tone: "amber" },
-  { label: "其他波动", count: 135, pct: 12, tone: "slate" },
-];
-
-const anomalyRows = [
-  { id: "DEMO-0724-018", queue: "队列 B", type: "边界偏移", score: 61, duration: "01:42", owner: "演示成员 03", severity: "高" },
-  { id: "DEMO-0724-014", queue: "队列 A", type: "信号缺失", score: 72, duration: "00:37", owner: "演示成员 01", severity: "中" },
-  { id: "DEMO-0723-106", queue: "队列 C", type: "规则冲突", score: 68, duration: "02:18", owner: "演示成员 05", severity: "中" },
-  { id: "DEMO-0723-082", queue: "队列 B", type: "边界偏移", score: 57, duration: "00:19", owner: "演示成员 02", severity: "高" },
-  { id: "DEMO-0722-224", queue: "队列 A", type: "其他波动", score: 79, duration: "01:06", owner: "演示成员 04", severity: "低" },
-];
-
-const guideSteps = [
-  {
-    eyebrow: "01 · 全局态势",
-    title: "先看懂今天发生了什么",
-    text: "四个指标把规模、覆盖、质量和效率放在同一视图中，并通过基准线直接标记偏离。",
-  },
-  {
-    eyebrow: "02 · 交叉定位",
-    title: "从趋势下钻到问题结构",
-    text: "时间和队列筛选会同步更新指标、趋势与异常列表，让定位路径保持一致。",
-  },
-  {
-    eyebrow: "03 · 样本复核",
-    title: "在详情中完成判断闭环",
-    text: "点击任一异常记录可查看虚构样本、判定依据和处理轨迹，并模拟完成复核。",
-  },
-  {
-    eyebrow: "04 · 作品说明",
-    title: "这是一份脱敏交互原型",
-    text: "页面不连接任何公司系统；名称、数值和样本均为演示数据，仅复现产品方法与操作逻辑。",
-  },
-];
-
-function formatCompact(value: number) {
-  return new Intl.NumberFormat("zh-CN", { notation: "compact", maximumFractionDigits: 1 }).format(value);
+function number(value: number) {
+  return new Intl.NumberFormat("zh-CN").format(value);
 }
 
-function TrendCanvas({
-  values,
-  labels,
-  accent = "#6d5dfc",
+function LineChart({
+  series,
+  labels = labels7d,
+  suffix = "%",
+  minValue,
 }: {
-  values: number[];
-  labels: string[];
-  accent?: string;
+  series: ChartSeries[];
+  labels?: string[];
+  suffix?: string;
+  minValue?: number;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
 
@@ -114,76 +159,71 @@ function TrendCanvas({
     ctx.scale(ratio, ratio);
     const width = rect.width;
     const height = rect.height;
-    const pad = { left: 42, right: 16, top: 24, bottom: 34 };
+    const pad = { left: 44, right: 18, top: 25, bottom: 36 };
+    const values = series.flatMap((item) => item.values);
+    const min = minValue ?? Math.floor(Math.min(...values) - 3);
+    const max = Math.ceil(Math.max(...values) + 3);
     const innerW = width - pad.left - pad.right;
     const innerH = height - pad.top - pad.bottom;
-    const min = Math.min(...values) - 2;
-    const max = Math.max(...values) + 2;
-    const x = (index: number) => pad.left + (innerW * index) / Math.max(values.length - 1, 1);
-    const y = (value: number) => pad.top + innerH - ((value - min) / (max - min)) * innerH;
+    const x = (index: number) => pad.left + (index * innerW) / Math.max(labels.length - 1, 1);
+    const y = (value: number) => pad.top + innerH - ((value - min) / Math.max(max - min, 1)) * innerH;
 
     ctx.clearRect(0, 0, width, height);
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = "rgba(29, 35, 55, 0.09)";
-    ctx.fillStyle = "#8a91a6";
     ctx.font = "11px ui-monospace, SFMono-Regular, Menlo, monospace";
     ctx.textAlign = "right";
-    for (let i = 0; i < 4; i += 1) {
-      const gy = pad.top + (innerH * i) / 3;
+    for (let index = 0; index < 4; index += 1) {
+      const gy = pad.top + (innerH * index) / 3;
+      ctx.strokeStyle = "rgba(44, 50, 72, .09)";
+      ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(pad.left, gy);
       ctx.lineTo(width - pad.right, gy);
       ctx.stroke();
-      const label = max - ((max - min) * i) / 3;
-      ctx.fillText(`${label.toFixed(0)}%`, pad.left - 8, gy + 4);
+      ctx.fillStyle = "#98a0b5";
+      const value = max - ((max - min) * index) / 3;
+      ctx.fillText(`${value.toFixed(suffix === "%" ? 0 : 1)}${suffix}`, pad.left - 8, gy + 4);
     }
 
-    const gradient = ctx.createLinearGradient(0, pad.top, 0, height - pad.bottom);
-    gradient.addColorStop(0, `${accent}35`);
-    gradient.addColorStop(1, `${accent}00`);
-    ctx.beginPath();
-    values.forEach((value, index) => {
-      const px = x(index);
-      const py = y(value);
-      if (index === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    });
-    ctx.lineTo(x(values.length - 1), height - pad.bottom);
-    ctx.lineTo(x(0), height - pad.bottom);
-    ctx.closePath();
-    ctx.fillStyle = gradient;
-    ctx.fill();
-
-    ctx.beginPath();
-    values.forEach((value, index) => {
-      const px = x(index);
-      const py = y(value);
-      if (index === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    });
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = 3;
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-    ctx.stroke();
-
-    values.forEach((value, index) => {
+    series.forEach((item) => {
+      const gradient = ctx.createLinearGradient(0, pad.top, 0, height - pad.bottom);
+      gradient.addColorStop(0, `${item.color}2f`);
+      gradient.addColorStop(1, `${item.color}00`);
       ctx.beginPath();
-      ctx.arc(x(index), y(value), index === values.length - 1 ? 5 : 3, 0, Math.PI * 2);
-      ctx.fillStyle = "#ffffff";
+      item.values.forEach((value, index) => {
+        if (index === 0) ctx.moveTo(x(index), y(value));
+        else ctx.lineTo(x(index), y(value));
+      });
+      ctx.lineTo(x(item.values.length - 1), height - pad.bottom);
+      ctx.lineTo(x(0), height - pad.bottom);
+      ctx.closePath();
+      ctx.fillStyle = gradient;
       ctx.fill();
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = accent;
+
+      ctx.beginPath();
+      item.values.forEach((value, index) => {
+        if (index === 0) ctx.moveTo(x(index), y(value));
+        else ctx.lineTo(x(index), y(value));
+      });
+      ctx.strokeStyle = item.color;
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
       ctx.stroke();
+      item.values.forEach((value, index) => {
+        ctx.beginPath();
+        ctx.arc(x(index), y(value), index === item.values.length - 1 ? 4 : 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = "#fff";
+        ctx.fill();
+        ctx.strokeStyle = item.color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      });
     });
 
+    ctx.fillStyle = "#98a0b5";
     ctx.textAlign = "center";
-    ctx.fillStyle = "#8a91a6";
-    labels.forEach((label, index) => {
-      if (labels.length > 8 && index % 2 === 1 && index !== labels.length - 1) return;
-      ctx.fillText(label, x(index), height - 10);
-    });
-  }, [accent, labels, values]);
+    labels.forEach((label, index) => ctx.fillText(label, x(index), height - 10));
+  }, [labels, minValue, series, suffix]);
 
   useEffect(() => {
     draw();
@@ -191,476 +231,623 @@ function TrendCanvas({
     return () => window.removeEventListener("resize", draw);
   }, [draw]);
 
-  return <canvas className="trend-canvas" ref={ref} aria-label="质量趋势折线图" role="img" />;
+  return <canvas ref={ref} className="line-chart" role="img" aria-label={`${series.map((item) => item.name).join("、")}趋势图`} />;
 }
 
-function MiniBars({ values, tone }: { values: number[]; tone: string }) {
-  const max = Math.max(...values);
+function MetricCard({
+  label,
+  value,
+  delta,
+  detail,
+  tone = "violet",
+}: {
+  label: string;
+  value: string;
+  delta?: string;
+  detail: string;
+  tone?: string;
+}) {
   return (
-    <div className={`mini-bars tone-${tone}`} aria-hidden="true">
-      {values.map((value, index) => (
-        <i key={`${value}-${index}`} style={{ height: `${Math.max((value / max) * 100, 14)}%` }} />
-      ))}
-    </div>
+    <article className={`metric-card tone-${tone}`}>
+      <div className="metric-top"><span>{label}</span><i /></div>
+      <strong>{value}</strong>
+      <p>{delta && <b className={delta.startsWith("-") ? "down" : "up"}>{delta}</b>} {detail}</p>
+    </article>
   );
+}
+
+function PanelTitle({
+  kicker,
+  title,
+  text,
+  action,
+}: {
+  kicker: string;
+  title: string;
+  text?: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <header className="panel-title">
+      <div>
+        <span>{kicker}</span>
+        <h3>{title}</h3>
+        {text && <p>{text}</p>}
+      </div>
+      {action}
+    </header>
+  );
+}
+
+function EmptyDemo({ text }: { text: string }) {
+  return <div className="empty-demo"><span>✓</span><b>{text}</b><p>调整筛选条件可查看其他演示记录。</p></div>;
 }
 
 export default function Home() {
-  const [period, setPeriod] = useState<Period>("7d");
-  const [scope, setScope] = useState("全量队列");
-  const [viewMode, setViewMode] = useState<ViewMode>("trend");
-  const [selectedRow, setSelectedRow] = useState<DrawerRow | null>(null);
-  const [guideOpen, setGuideOpen] = useState(false);
-  const [guideStep, setGuideStep] = useState(0);
-  const [toast, setToast] = useState("");
-  const [reviewed, setReviewed] = useState<string[]>([]);
-  const [issueFilter, setIssueFilter] = useState("全部类型");
-
-  const base = periodData[period];
-  const tuning = scopeTuning[scope];
-  const metrics = useMemo(
-    () => ({
-      volume: Math.round(base.volume * tuning.volume),
-      coverage: base.coverage + tuning.score * 0.42,
-      quality: base.quality + tuning.score,
-      efficiency: base.efficiency + tuning.time,
-      trend: base.trend.map((value, index) => Number((value + tuning.score + (index % 3 === 0 ? 0.2 : 0)).toFixed(1))),
-    }),
-    [base, tuning],
-  );
-
-  const visibleRows = anomalyRows.filter((row) => {
-    const scopeMatch = scope === "全量队列" || row.queue === scope;
-    const issueMatch = issueFilter === "全部类型" || row.type === issueFilter;
-    return scopeMatch && issueMatch;
+  const [mainTab, setMainTab] = useState<MainTab>("strategy");
+  const [baseView, setBaseView] = useState<BaseView>("overview");
+  const [qualityView, setQualityView] = useState<QualityView>("metrics");
+  const [strategyStep, setStrategyStep] = useState<StrategyStep>("discover");
+  const [monitorView, setMonitorView] = useState<MonitorView>("quality");
+  const [strategyId, setStrategyId] = useState<StrategyId>("A");
+  const [metricKey, setMetricKey] = useState<keyof typeof qualityMetrics>("iou");
+  const [period, setPeriod] = useState("近 7 天");
+  const [team, setTeam] = useState("全部团队");
+  const [channel, setChannel] = useState("全部队列");
+  const [label, setLabel] = useState("全部标签");
+  const [durationReason, setDurationReason] = useState("全部");
+  const [checkedSamples, setCheckedSamples] = useState<string[]>(["S-2407-01", "S-2407-02", "S-2407-03", "S-2407-04"]);
+  const [trackedSamples, setTrackedSamples] = useState<string[]>(["S-2407-01", "S-2407-02", "S-2407-03", "S-2407-04"]);
+  const [selectedSample, setSelectedSample] = useState<Sample | null>(null);
+  const [definitions, setDefinitions] = useState<Record<string, Definition>>(initialDefinitions);
+  const [submissions, setSubmissions] = useState([
+    { id: 1, time: "07/22 16:40", count: 3, note: "第 1 版 · 已同步跟台结果" },
+  ]);
+  const [resolutionIndex, setResolutionIndex] = useState<Record<string, number>>({});
+  const [solutionTab, setSolutionTab] = useState<"batch" | "global">("batch");
+  const [globalStatus, setGlobalStatus] = useState<Record<string, string>>({
+    "G-001": "已解决",
+    "G-002": "未解决",
+    "G-003": "处理中",
   });
+  const [toast, setToast] = useState("");
+  const [tourOpen, setTourOpen] = useState(false);
+
+  const activeMetric = qualityMetrics[metricKey];
+  const tracked = strategySamples.filter((sample) => trackedSamples.includes(sample.id));
+  const filteredDurationRows = durationRows.filter((row) => durationReason === "全部" || row.reason === durationReason);
+
+  const problems = useMemo(() => {
+    const grouped = new Map<string, { key: string; category: string; record: string; sampleIds: string[] }>();
+    trackedSamples.forEach((sampleId) => {
+      const definition = definitions[sampleId];
+      if (!definition?.category || !definition.record || definition.category === "无问题") return;
+      const key = `${definition.category}__${definition.record}`;
+      const current = grouped.get(key) ?? { key, category: definition.category, record: definition.record, sampleIds: [] };
+      current.sampleIds.push(sampleId);
+      grouped.set(key, current);
+    });
+    return Array.from(grouped.values());
+  }, [definitions, trackedSamples]);
 
   const showToast = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 2600);
   };
 
-  const scrollTo = (id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const switchMain = (tab: MainTab) => {
+    setMainTab(tab);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const reviewSelected = () => {
-    if (!selectedRow) return;
-    setReviewed((current) => (current.includes(selectedRow.id) ? current : [...current, selectedRow.id]));
-    setSelectedRow(null);
-    showToast("已完成演示复核 · 状态仅保存在当前页面");
+  const updateDefinition = (sampleId: string, patch: Partial<Definition>) => {
+    setDefinitions((current) => ({
+      ...current,
+      [sampleId]: { viewed: false, category: "", record: "", ...current[sampleId], ...patch },
+    }));
   };
 
-  return (
-    <main className="app-shell">
-      <aside className="sidebar">
-        <button className="brand" onClick={() => scrollTo("overview")} aria-label="返回总览">
-          <span className="brand-mark">A</span>
-          <span>
-            <b>Atlas</b>
-            <small>质量洞察台</small>
-          </span>
-        </button>
-        <nav aria-label="主导航">
-          <button className="nav-item active" onClick={() => scrollTo("overview")}>
-            <span>01</span>态势总览
-          </button>
-          <button className="nav-item" onClick={() => scrollTo("quality")}>
-            <span>02</span>质量监控
-          </button>
-          <button className="nav-item" onClick={() => scrollTo("anomalies")}>
-            <span>03</span>异常定位
-          </button>
-          <button className="nav-item" onClick={() => scrollTo("project")}>
-            <span>04</span>项目说明
-          </button>
-        </nav>
-        <div className="sidebar-note">
-          <span className="pulse-dot" />
-          <div>
-            <b>演示环境</b>
-            <p>数据更新于 2 分钟前</p>
-          </div>
+  const addTrackedSamples = () => {
+    setTrackedSamples((current) => Array.from(new Set([...current, ...checkedSamples])));
+    showToast(`已将 ${checkedSamples.length} 条样本加入跟台池`);
+  };
+
+  const submitDefinitions = () => {
+    const completed = tracked.filter((sample) => definitions[sample.id]?.category && definitions[sample.id]?.record).length;
+    setSubmissions((current) => [
+      ...current,
+      { id: current.length + 1, time: "刚刚", count: completed, note: `第 ${current.length + 1} 版 · 完整快照` },
+    ]);
+    showToast(`已提交 ${completed} 条问题定义，历史版本已保留`);
+  };
+
+  const getFlow = (category: string) =>
+    category.includes("人审")
+      ? ["待宣讲", "已宣讲", "已扣分 / 完成"]
+      : ["待移交", "已移交", "全局池处理中", "已解决"];
+
+  const resetDemo = () => {
+    setMainTab("strategy");
+    setStrategyStep("discover");
+    setStrategyId("A");
+    setCheckedSamples(["S-2407-01", "S-2407-02", "S-2407-03", "S-2407-04"]);
+    setTrackedSamples(["S-2407-01", "S-2407-02", "S-2407-03", "S-2407-04"]);
+    setDefinitions(initialDefinitions);
+    setResolutionIndex({});
+    showToast("演示状态已重置");
+  };
+
+  const renderBase = () => (
+    <>
+      <section className="page-intro">
+        <div>
+          <span className="eyebrow">BASE DATA · DESENSITIZED</span>
+          <h2>看清审核标记的<span>规模与结构</span></h2>
+          <p>从全量片段、元素、标签与标记方式出发，为质量分析和策略发现建立统一数据底座。</p>
         </div>
-        <div className="privacy-card">
-          <span>DEMO ONLY</span>
-          <p>全部名称、样本与数值均为虚构，不连接真实业务系统。</p>
-        </div>
-      </aside>
+        <div className="intro-stat"><b>68.8<small>万</small></b><span>演示口径映射的记录规模</span></div>
+      </section>
 
-      <section className="main-area">
-        <header className="topbar">
-          <div>
-            <div className="breadcrumb">作品集 / 数据产品 / <b>交互演示</b></div>
-            <h1>内容质量运营看板</h1>
-          </div>
-          <div className="top-actions">
-            <button className="ghost-button" onClick={() => showToast("演示快照已生成 · 未包含真实文件")}>
-              导出快照
-            </button>
-            <button
-              className="primary-button"
-              onClick={() => {
-                setGuideStep(0);
-                setGuideOpen(true);
-              }}
-            >
-              <span className="play-icon">▶</span> 演示导览
-            </button>
-            <span className="avatar" aria-label="演示账户">DE</span>
-          </div>
-        </header>
+      <nav className="subnav" aria-label="基础数据模块">
+        {baseViews.map((view) => (
+          <button key={view.id} className={baseView === view.id ? "active" : ""} onClick={() => setBaseView(view.id)}>
+            <b>{view.label}</b><span>{view.hint}</span>
+          </button>
+        ))}
+      </nav>
 
-        <div className="content">
-          <section className="hero" id="overview">
-            <div className="hero-copy">
-              <span className="section-kicker">OPERATION PULSE · 07/24</span>
-              <h2>
-                从数据波动，
-                <br />
-                追到<span>每一条异常样本</span>
-              </h2>
-              <p>
-                为日常质量运营设计的一站式工作台。把监控、定位、复核与复盘串成一条可操作的数据链路。
-              </p>
-              <div className="hero-tags">
-                <span>全局监控</span>
-                <span>异常下钻</span>
-                <span>样本复核</span>
-              </div>
-            </div>
-            <div className="hero-signal" aria-label="今日运行状态">
-              <div className="signal-orbit">
-                <div className="signal-core">
-                  <b>{metrics.quality.toFixed(1)}</b>
-                  <span>质量指数</span>
-                </div>
-                <i className="orbit-dot dot-a" />
-                <i className="orbit-dot dot-b" />
-                <i className="orbit-dot dot-c" />
-              </div>
-              <div className="signal-caption">
-                <span className="status-pill">运行平稳</span>
-                <p>较昨日 <b>+1.3</b> · 高于目标线</p>
-              </div>
-            </div>
+      <Filters period={period} setPeriod={setPeriod} team={team} setTeam={setTeam} channel={channel} setChannel={setChannel} label={label} setLabel={setLabel} />
+
+      {baseView === "overview" && (
+        <>
+          <section className="metric-grid five">
+            <MetricCard label="标记片段数" value="68.8万" delta="+8.4%" detail="环比上周期" tone="ink" />
+            <MetricCard label="元素数" value="29.6万" delta="+5.1%" detail="去重内容元素" />
+            <MetricCard label="ASR 片段" value="55.4%" delta="+1.7%" detail="主导标记方式" tone="cyan" />
+            <MetricCard label="手打片段" value="44.6%" delta="-1.7%" detail="片段人工选择" tone="amber" />
+            <MetricCard label="帧 / OCR 信号" value="1.36%" delta="+0.2%" detail="辅助信号占比" tone="rose" />
           </section>
-
-          <section className="control-bar" aria-label="全局筛选">
-            <div className="segment-control">
-              {periods.map((item) => (
-                <button
-                  key={item.key}
-                  className={period === item.key ? "selected" : ""}
-                  onClick={() => setPeriod(item.key)}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-            <label className="scope-select">
-              <span>观察范围</span>
-              <select value={scope} onChange={(event) => setScope(event.target.value)}>
-                {scopeOptions.map((option) => (
-                  <option key={option}>{option}</option>
-                ))}
-              </select>
-            </label>
-            <div className="filter-health">
-              <i />
-              筛选已同步至全页面
-            </div>
-          </section>
-
-          <section className="metric-grid" aria-label="核心指标">
-            <article className="metric-card metric-dark">
-              <div className="metric-heading">
-                <span>处理规模</span>
-                <em>总量</em>
-              </div>
-              <strong>{formatCompact(metrics.volume)}</strong>
-              <div className="metric-foot positive">↗ 12.4% <span>环比上期</span></div>
-              <MiniBars values={[32, 46, 38, 62, 54, 78, 72]} tone="light" />
+          <section className="grid two-one">
+            <article className="panel">
+              <PanelTitle kicker="VOLUME TREND" title="片段与元素趋势" text="同一筛选条件下观察处理规模与内容规模。" action={<span className="legend-pair"><i className="violet" />片段 <i className="green" />元素</span>} />
+              <LineChart
+                suffix="万"
+                minValue={0}
+                series={[
+                  { name: "片段数", color: "#7357ff", values: [9.89, 10.48, 10.02, 10.21, 10.51, 9.43, 8.21] },
+                  { name: "元素数", color: "#15a98c", values: [4.12, 4.36, 4.19, 4.26, 4.42, 3.98, 3.72] },
+                ]}
+              />
             </article>
-            <article className="metric-card">
-              <div className="metric-heading">
-                <span>信号覆盖率</span>
-                <em>目标 90%</em>
-              </div>
-              <strong>{metrics.coverage.toFixed(1)}<small>%</small></strong>
-              <div className="metric-foot positive">↗ 2.1% <span>高于目标</span></div>
-              <MiniBars values={[62, 66, 70, 69, 77, 83, 88]} tone="violet" />
-            </article>
-            <article className="metric-card">
-              <div className="metric-heading">
-                <span>质量指数</span>
-                <em>目标 85%</em>
-              </div>
-              <strong>{metrics.quality.toFixed(1)}<small>%</small></strong>
-              <div className="metric-foot positive">↗ 1.3% <span>较昨日</span></div>
-              <MiniBars values={metrics.trend.slice(-7)} tone="cyan" />
-            </article>
-            <article className="metric-card">
-              <div className="metric-heading">
-                <span>平均处理耗时</span>
-                <em>越低越好</em>
-              </div>
-              <strong>{metrics.efficiency.toFixed(1)}<small>s</small></strong>
-              <div className="metric-foot positive">↘ 4.8% <span>效率提升</span></div>
-              <MiniBars values={[76, 68, 72, 59, 52, 48, 42]} tone="amber" />
-            </article>
-          </section>
-
-          <section className="panel-grid" id="quality">
-            <article className="panel trend-panel">
-              <div className="panel-header">
-                <div>
-                  <span className="panel-kicker">QUALITY SIGNAL</span>
-                  <h3>质量趋势与异常构成</h3>
+            <article className="panel signal-panel">
+              <PanelTitle kicker="SIGNAL MIX" title="标记方式构成" text="片段类型只由 ASR 计数判断；帧与 OCR 作为元素辅助信号。" />
+              <div className="donut-wrap">
+                <div className="donut" style={{ "--a": "55.4%", "--b": "44.6%" } as React.CSSProperties}><span><b>68.8万</b><small>总片段</small></span></div>
+                <div className="donut-legend">
+                  <p><i className="violet" /><span>ASR 片段</span><b>55.4%</b></p>
+                  <p><i className="amber" /><span>手打片段</span><b>44.6%</b></p>
+                  <p><i className="cyan" /><span>包含 OCR</span><b>0.79%</b></p>
+                  <p><i className="rose" /><span>包含视频帧</span><b>0.57%</b></p>
                 </div>
-                <div className="panel-tabs">
-                  <button className={viewMode === "trend" ? "active" : ""} onClick={() => setViewMode("trend")}>质量趋势</button>
-                  <button className={viewMode === "mix" ? "active" : ""} onClick={() => setViewMode("mix")}>异常构成</button>
-                </div>
-              </div>
-              {viewMode === "trend" ? (
-                <>
-                  <div className="chart-summary">
-                    <div><span>当前</span><b>{metrics.quality.toFixed(1)}%</b></div>
-                    <div><span>周期低点</span><b>{Math.min(...metrics.trend).toFixed(1)}%</b></div>
-                    <div className="legend"><i />质量指数 <i className="target" />目标线 85%</div>
-                  </div>
-                  <TrendCanvas values={metrics.trend} labels={base.labels} />
-                </>
-              ) : (
-                <div className="mix-view">
-                  {issueMix.map((issue) => (
-                    <button
-                      key={issue.label}
-                      className="mix-row"
-                      onClick={() => {
-                        setIssueFilter(issue.label);
-                        scrollTo("anomalies");
-                      }}
-                    >
-                      <span className={`mix-dot ${issue.tone}`} />
-                      <b>{issue.label}</b>
-                      <div className="mix-track"><i className={issue.tone} style={{ width: `${issue.pct}%` }} /></div>
-                      <strong>{issue.pct}%</strong>
-                      <em>{issue.count} 条</em>
-                    </button>
-                  ))}
-                  <p className="mix-hint">点击任一类型，异常列表会自动过滤。</p>
-                </div>
-              )}
-            </article>
-
-            <article className="panel action-panel">
-              <div className="panel-header">
-                <div>
-                  <span className="panel-kicker">NEXT BEST ACTION</span>
-                  <h3>今日处置优先级</h3>
-                </div>
-                <span className="live-badge"><i />LIVE</span>
-              </div>
-              <div className="action-list">
-                <button onClick={() => { setScope("队列 B"); scrollTo("anomalies"); }}>
-                  <span className="action-rank urgent">01</span>
-                  <div><b>队列 B · 质量下探</b><p>连续 3 个观察点低于目标线</p></div>
-                  <em>立即查看 →</em>
-                </button>
-                <button onClick={() => { setIssueFilter("边界偏移"); scrollTo("anomalies"); }}>
-                  <span className="action-rank">02</span>
-                  <div><b>边界偏移 · 样本聚集</b><p>占今日异常总量的 38%</p></div>
-                  <em>定位样本 →</em>
-                </button>
-                <button onClick={() => showToast("演示提醒已记录 · 不会发送真实通知")}>
-                  <span className="action-rank">03</span>
-                  <div><b>复核任务 · 即将逾期</b><p>7 条样本距处理时限不足 2 小时</p></div>
-                  <em>创建提醒 →</em>
-                </button>
-              </div>
-              <div className="coverage-strip">
-                <div><span>自动识别</span><b>78%</b></div>
-                <div className="coverage-track"><i /></div>
-                <small>其余 22% 进入人工复核队列</small>
               </div>
             </article>
           </section>
-
-          <section className="panel table-panel" id="anomalies">
-            <div className="panel-header table-title">
-              <div>
-                <span className="panel-kicker">ANOMALY WORKBENCH</span>
-                <h3>异常样本工作台</h3>
-                <p>共 {visibleRows.length} 条演示记录 · 点击行查看判定依据</p>
-              </div>
-              <div className="table-controls">
-                <label>
-                  <span>异常类型</span>
-                  <select value={issueFilter} onChange={(event) => setIssueFilter(event.target.value)}>
-                    <option>全部类型</option>
-                    {issueMix.map((issue) => <option key={issue.label}>{issue.label}</option>)}
-                  </select>
-                </label>
-                <button className="reset-button" onClick={() => { setScope("全量队列"); setIssueFilter("全部类型"); }}>重置</button>
-              </div>
-            </div>
+          <article className="panel table-panel">
+            <PanelTitle kicker="DIMENSION DRILLDOWN" title="标签 × 队列下钻" text="可切换标签、队列、团队口径查看片段分布与元素规模。" action={<button className="quiet-button" onClick={() => showToast("演示文件已生成，不包含真实标签或明细")}>导出演示表</button>} />
             <div className="table-wrap">
               <table>
-                <thead>
-                  <tr>
-                    <th>样本编号</th>
-                    <th>队列</th>
-                    <th>异常类型</th>
-                    <th>质量分</th>
-                    <th>内容时长</th>
-                    <th>复核角色</th>
-                    <th>优先级</th>
-                    <th>状态</th>
-                    <th aria-label="操作" />
-                  </tr>
-                </thead>
+                <thead><tr><th>标签</th><th>主要队列</th><th>片段数</th><th>手打片段</th><th>ASR 片段</th><th>帧 / OCR</th><th>分布</th><th>元素数</th></tr></thead>
                 <tbody>
-                  {visibleRows.map((row) => (
-                    <tr key={row.id} onClick={() => setSelectedRow(row)} tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter") setSelectedRow(row); }}>
-                      <td><span className="mono">{row.id}</span></td>
-                      <td><span className="queue-pill">{row.queue}</span></td>
-                      <td>{row.type}</td>
-                      <td><span className={`score score-${row.score < 65 ? "low" : "mid"}`}>{row.score}</span></td>
-                      <td className="mono">{row.duration}</td>
-                      <td>{row.owner}</td>
-                      <td><span className={`severity severity-${row.severity}`}>{row.severity}</span></td>
-                      <td>{reviewed.includes(row.id) ? <span className="reviewed">已复核</span> : <span className="pending">待处理</span>}</td>
-                      <td><button className="row-arrow" aria-label={`查看 ${row.id} 详情`}>→</button></td>
+                  {baseRows.map((row) => (
+                    <tr key={row.label}>
+                      <td><b>{row.label}</b></td><td><span className="soft-pill">{row.channel}</span></td><td>{number(row.segments)}</td><td>{number(row.manual)}</td><td>{number(row.asr)}</td><td>{row.frame} / {row.ocr}</td>
+                      <td><div className="split-bar" title="ASR / 手打"><i style={{ width: `${(row.asr / row.segments) * 100}%` }} /><b /></div></td><td>{number(row.elements)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {visibleRows.length === 0 && (
-                <div className="empty-state">
-                  <span>✓</span>
-                  <b>当前筛选下没有异常记录</b>
-                  <p>这是一个好信号，也可以重置筛选查看全部演示样本。</p>
+            </div>
+          </article>
+        </>
+      )}
+
+      {baseView === "labels" && (
+        <>
+          <section className="metric-grid three">
+            <MetricCard label="ASR 主导标签" value="62" delta="+4" detail="主导占比 ≥ 70%" />
+            <MetricCard label="手打主导标签" value="47" delta="-2" detail="主导占比 ≥ 70%" tone="amber" />
+            <MetricCard label="无明显分布" value="94" delta="+6" detail="需要继续观察" tone="cyan" />
+          </section>
+          <section className="grid equal">
+            <article className="panel">
+              <PanelTitle kicker="CLASSIFICATION SHIFT" title="标签分类迁移" text="对比前后周期，识别主导标记方式发生变化的标签。" />
+              <div className="classification-list">
+                {labelGroups.map((item) => (
+                  <div key={item.label}><span><b>{item.label}</b><small>{number(item.volume)} 条</small></span><em className={`kind ${item.kind.includes("ASR") ? "purple" : item.kind.includes("手打") ? "orange" : "gray"}`}>{item.kind}</em><div className="compare-bars"><i style={{ width: `${item.previous}%` }} /><b style={{ width: `${item.current}%` }} /></div><strong>{item.previous}% → {item.current}%</strong></div>
+                ))}
+              </div>
+            </article>
+            <article className="panel">
+              <PanelTitle kicker="THREE-LAYER VIEW" title="三层分布圈" text="由外到内：至少一队列主导、全局主导、全队列一致主导。" />
+              <div className="rings-area">
+                <div className="rings">
+                  <i /><b /><span><strong>ASR</strong><small>主导关系</small></span>
                 </div>
-              )}
-            </div>
+                <div className="ring-notes">
+                  <p><i className="outer" /><span>至少一队列主导</span><b>86</b></p>
+                  <p><i className="middle" /><span>全局主导</span><b>62</b></p>
+                  <p><i className="inner" /><span>全队列一致主导</span><b>31</b></p>
+                </div>
+              </div>
+              <button className="full-button" onClick={() => showToast("已切换为手打主导视角（演示）")}>切换为手打主导视角</button>
+            </article>
           </section>
+        </>
+      )}
 
-          <section className="project-section" id="project">
-            <div className="project-intro">
-              <span className="section-kicker">PROJECT NOTE · PRIVACY-SAFE DEMO</span>
-              <h2>不展示业务秘密，<br />只展示<span>解决问题的方法</span></h2>
-              <p>这份演示站点用于还原数据产品的完整思路：统一口径、识别波动、定位样本、推动处置并沉淀复盘。</p>
-            </div>
-            <div className="project-steps">
-              <article><span>01</span><div><b>问题定义</b><p>把模糊的“质量不好”拆成可量化、可追踪的运营指标。</p></div></article>
-              <article><span>02</span><div><b>指标体系</b><p>同时观察规模、覆盖、质量与效率，避免单指标误判。</p></div></article>
-              <article><span>03</span><div><b>分析闭环</b><p>从汇总视图下钻至虚构样本，并记录处理状态。</p></div></article>
-              <article><span>04</span><div><b>交付方式</b><p>以轻量网页承载高频工作流，让一线角色能直接使用。</p></div></article>
-            </div>
+      {baseView === "element" && (
+        <>
+          <section className="metric-grid four">
+            <MetricCard label="平均片段数" value="1.72" delta="+0.08" detail="每个元素" />
+            <MetricCard label="最大片段数" value="12" detail="单元素峰值" tone="ink" />
+            <MetricCard label="异常阈值" value="4.8" detail="均值 + 2σ" tone="amber" />
+            <MetricCard label="异常元素" value="286" delta="-14" detail="较上周期" tone="cyan" />
           </section>
+          <section className="grid two-one">
+            <article className="panel">
+              <PanelTitle kicker="SEGMENTS / ELEMENT" title="单元素片段数分布" text="长尾元素是多片段策略的主要候选池。" />
+              <div className="histogram">
+                {[92, 66, 42, 27, 18, 12, 8, 5, 3].map((value, index) => <div key={index}><i style={{ height: `${value}%` }} /><span>{index + 1}{index === 8 ? "+" : ""}</span></div>)}
+              </div>
+              <div className="threshold-note"><i />异常阈值 4.8：超过阈值的元素进入策略候选池</div>
+            </article>
+            <article className="panel">
+              <PanelTitle kicker="ANOMALY SHARE" title="异常元素构成" />
+              <div className="vertical-stats">
+                <div><span>ASR 多片段</span><b>58%</b><i><em style={{ width: "58%" }} /></i></div>
+                <div><span>手打多片段</span><b>29%</b><i><em style={{ width: "29%" }} /></i></div>
+                <div><span>混合信号</span><b>13%</b><i><em style={{ width: "13%" }} /></i></div>
+              </div>
+            </article>
+          </section>
+          <article className="panel table-panel">
+            <PanelTitle kicker="OUTLIER LIST" title="异常元素明细" text="点击策略入口可带入当前元素和标签条件。" />
+            <div className="table-wrap"><table><thead><tr><th>演示元素 ID</th><th>标签</th><th>片段数</th><th>标签均值</th><th>偏离</th><th>类型</th><th>状态</th><th /></tr></thead><tbody>
+              {elementRows.map((row) => <tr key={row.id}><td className="mono">{row.id}</td><td>{row.label}</td><td><b>{row.segments}</b></td><td>{row.average}</td><td className="danger-text">{row.deviation}</td><td>{row.type}</td><td><span className={`risk risk-${row.status}`}>{row.status}</span></td><td><button className="link-button" onClick={() => { setMainTab("strategy"); setStrategyId("B"); setStrategyStep("discover"); }}>进入策略 →</button></td></tr>)}
+            </tbody></table></div>
+          </article>
+        </>
+      )}
 
-          <footer>
-            <div><span className="brand-mark small">A</span><b>Atlas Demo</b></div>
-            <p>Portfolio prototype · Built for interview storytelling</p>
-            <span>所有数据均为模拟数据</span>
-          </footer>
+      {baseView === "cluster" && (
+        <section className="grid equal">
+          <article className="panel">
+            <PanelTitle kicker="ASR DURATION" title="ASR 片段时长分布" text="支持自定义区间，观察识别片段集中度。" action={<span className="soft-pill">38.1 万片段</span>} />
+            <div className="bucket-bars">
+              {[18, 46, 83, 70, 51, 34, 21].map((value, index) => <div key={index}><span>{["0–2s", "2–5s", "5–10s", "10–20s", "20–40s", "40–90s", "90s+"][index]}</span><i><b style={{ width: `${value}%` }} /></i><em>{value}%</em></div>)}
+            </div>
+          </article>
+          <article className="panel">
+            <PanelTitle kicker="MANUAL DURATION" title="手打片段时长分布" text="对比 ASR 与人工框选的时长结构。" action={<span className="soft-pill">30.7 万片段</span>} />
+            <div className="bucket-bars orange">
+              {[28, 53, 66, 74, 58, 39, 31].map((value, index) => <div key={index}><span>{["0–2s", "2–5s", "5–10s", "10–20s", "20–40s", "40–90s", "90s+"][index]}</span><i><b style={{ width: `${value}%` }} /></i><em>{value}%</em></div>)}
+            </div>
+          </article>
+          <article className="panel custom-bucket">
+            <PanelTitle kicker="CUSTOM BUCKET" title="自定义聚类区间" text="用于快速验证新的时长口径，演示环境仅在本页生效。" />
+            <div><label>起始秒数<input defaultValue="2" /></label><label>结束秒数<input defaultValue="8" /></label><button className="primary-button" onClick={() => showToast("已生成 2–8 秒演示区间")}>生成区间</button></div>
+          </article>
+          <article className="panel">
+            <PanelTitle kicker="CLUSTER INSIGHT" title="本期观察" />
+            <div className="insight-note"><span>01</span><p><b>手打长片段占比上升</b>40 秒以上区间较上期增加 3.4 个百分点。</p></div>
+            <div className="insight-note"><span>02</span><p><b>ASR 集中于 5–20 秒</b>该区间承载约 61% 的识别片段。</p></div>
+          </article>
+        </section>
+      )}
+    </>
+  );
+
+  const renderQuality = () => (
+    <>
+      <section className="page-intro quality-intro">
+        <div><span className="eyebrow">QUALITY CONTROL · REVIEW VS QC</span><h2>把差异拆成<span>可定位的质量信号</span></h2><p>统一观察准确性、段落重合、标签差错、重复差异与审核耗时，并下钻到队列与标签组合。</p></div>
+        <div className="intro-stat"><b>6.3<small>万</small></b><span>演示口径映射的对比记录</span></div>
+      </section>
+      <nav className="subnav compact" aria-label="质量数据模块">
+        {qualityViews.map((view) => <button key={view.id} className={qualityView === view.id ? "active" : ""} onClick={() => setQualityView(view.id)}><b>{view.label}</b><span>{view.hint}</span></button>)}
+      </nav>
+      <Filters period={period} setPeriod={setPeriod} team={team} setTeam={setTeam} channel={channel} setChannel={setChannel} label={label} setLabel={setLabel} />
+
+      {qualityView === "metrics" && (
+        <>
+          <div className="metric-selector">
+            {Object.entries(qualityMetrics).map(([key, metric]) => <button key={key} className={metricKey === key ? "active" : ""} onClick={() => setMetricKey(key as keyof typeof qualityMetrics)}><span>{metric.label}</span><b>{metric.value}</b><em>{metric.delta}</em></button>)}
+          </div>
+          <section className="metric-grid four">
+            <MetricCard label="IoU" value="86.4%" delta="+2.1%" detail="段落重合度" />
+            <MetricCard label="正确打标率" value="92.7%" delta="+1.3%" detail="标签与片段均正确" tone="cyan" />
+            <MetricCard label="简单重复差异" value="1.8%" delta="-0.6%" detail="一审与质检差异" tone="amber" />
+            <MetricCard label="平均审核耗时" value="41.6s" delta="-3.2s" detail="前端操作耗时" tone="ink" />
+          </section>
+          <section className="grid two-one">
+            <article className="panel">
+              <PanelTitle kicker="OVERALL TREND" title={`${activeMetric.label} · 全量趋势`} text="指标选择会同步更新趋势与维度定位。" action={<span className="big-delta"><b>{activeMetric.value}</b><em>{activeMetric.delta}</em></span>} />
+              <LineChart series={[{ name: activeMetric.label, color: activeMetric.color, values: activeMetric.values }]} minValue={metricKey === "repeat" || metricKey === "fast" ? 0 : undefined} />
+            </article>
+            <article className="panel">
+              <PanelTitle kicker="ERROR STRUCTURE" title="差错结构 M6" text="按差错类型拆解当前质量损失。" />
+              <div className="error-structure">
+                {[["漏标", 38, "violet"], ["错标", 27, "cyan"], ["边界偏移", 22, "amber"], ["重复差异", 13, "rose"]].map(([name, value, tone]) => <div key={name}><span><i className={tone} />{name}</span><b>{value}%</b><em><i className={tone} style={{ width: `${value}%` }} /></em></div>)}
+              </div>
+            </article>
+          </section>
+          <section className="grid equal">
+            <article className="panel heatmap-panel">
+              <PanelTitle kicker="CROSS HEATMAP" title="团队 × 队列质量热力" text="颜色越深代表指标越低，点击单元格可模拟下钻。" />
+              <div className="heatmap">
+                <span />
+                {["队列 01", "队列 02", "队列 03", "队列 04"].map((item) => <b key={item}>{item}</b>)}
+                {heatmap.map((row, rowIndex) => (
+                  <div className="heatmap-row" key={rowIndex}>
+                    <b>团队 {String.fromCharCode(65 + rowIndex)}</b>
+                    {row.map((value, columnIndex) => <button key={columnIndex} style={{ "--heat": `${Math.max(0.18, (95 - value) / 12)}` } as React.CSSProperties} onClick={() => showToast(`已定位：团队 ${String.fromCharCode(65 + rowIndex)} × 队列 0${columnIndex + 1}`)}>{value}%</button>)}
+                  </div>
+                ))}
+              </div>
+            </article>
+            <article className="panel">
+              <PanelTitle kicker="BOTTOM COMBINATIONS" title="表现较弱组合 Top 10" text="当前展示前 5 条演示组合。" />
+              <div className="ranking-list">
+                {[["团队 C × 队列 02", 84, -3.2], ["团队 D × 队列 04", 85, -2.7], ["团队 B × 队列 02", 86, -2.1], ["团队 C × 队列 03", 87, -1.8], ["团队 B × 队列 04", 88, -1.3]].map((item, index) => <button key={String(item[0])} onClick={() => showToast(`已应用组合筛选：${item[0]}`)}><span>{String(index + 1).padStart(2, "0")}</span><b>{item[0]}</b><i><em style={{ width: `${Number(item[1])}%` }} /></i><strong>{item[1]}%</strong><small>{item[2]}pp</small></button>)}
+              </div>
+            </article>
+          </section>
+        </>
+      )}
+
+      {qualityView === "duration" && (
+        <>
+          <section className="metric-grid four">
+            <MetricCard label="异常时长片段" value="3,284" delta="-6.8%" detail="过长 + 过短" tone="ink" />
+            <MetricCard label="超长片段" value="1,486" detail="片段 / 视频 ≥ 90%" tone="rose" />
+            <MetricCard label="超短片段" value="1,798" detail="片段时长 ≤ 2 秒" tone="amber" />
+            <MetricCard label="不合理占比" value="38.6%" delta="-4.2%" detail="按标签字典判定" tone="cyan" />
+          </section>
+          <section className="grid two-one">
+            <article className="panel">
+              <PanelTitle kicker="DURATION TREND" title="异常时长趋势" text="同时观察过长与过短片段。" action={<span className="legend-pair"><i className="rose" />超长 <i className="orange" />超短</span>} />
+              <LineChart suffix="条" minValue={0} series={[{ name: "超长", color: "#df6178", values: [248, 232, 226, 218, 207, 191, 164] }, { name: "超短", color: "#eda43f", values: [286, 278, 269, 254, 246, 234, 231] }]} />
+            </article>
+            <article className="panel">
+              <PanelTitle kicker="REASONABILITY" title="合理性拆分" text="基于脱敏后的标签字典映射。" />
+              <div className="reason-cards">
+                <button className={durationReason === "全部" ? "active" : ""} onClick={() => setDurationReason("全部")}><span>全部</span><b>3,284</b></button>
+                <button className={durationReason === "合理" ? "active green" : ""} onClick={() => setDurationReason("合理")}><span>合理</span><b>2,016</b></button>
+                <button className={durationReason === "不合理" ? "active red" : ""} onClick={() => setDurationReason("不合理")}><span>不合理</span><b>1,268</b></button>
+              </div>
+              <p className="logic-note"><b>判定口径</b>：超长 ≥ 视频时长 90%；超短 ≤ 2 秒。合理性根据标签的业务属性字典判断。</p>
+            </article>
+          </section>
+          <article className="panel table-panel">
+            <PanelTitle kicker="DURATION DRILLDOWN" title="异常片段明细预览" text="支持按标签、队列与合理性下钻；公开版仅展示虚构记录。" action={<button className="quiet-button" onClick={() => showToast("已生成脱敏 Excel（演示）")}>下载 Excel</button>} />
+            <div className="table-wrap"><table><thead><tr><th>演示记录</th><th>标签</th><th>队列</th><th>类型</th><th>片段 / 视频</th><th>占比</th><th>合理性</th><th>同类条数</th></tr></thead><tbody>
+              {filteredDurationRows.map((row) => <tr key={row.id}><td className="mono">{row.id}</td><td>{row.label}</td><td>{row.channel}</td><td><span className={`soft-pill ${row.type === "超长" ? "red" : "orange"}`}>{row.type}</span></td><td>{row.duration}</td><td>{row.ratio}</td><td><span className={`reason ${row.reason === "合理" ? "good" : "bad"}`}>{row.reason}</span></td><td>{row.count}</td></tr>)}
+            </tbody></table>{filteredDurationRows.length === 0 && <EmptyDemo text="当前筛选下没有记录" />}</div>
+          </article>
+        </>
+      )}
+    </>
+  );
+
+  const renderStrategy = () => (
+    <>
+      <section className="page-intro strategy-intro">
+        <div><span className="eyebrow">STRATEGY LOOP · CORE MODULE</span><h2>从异常发现，到<span>问题真正解决</span></h2><p>把数据策略、样本跟台、问题归因、责任流转与效果监测串成可追溯的质量改进闭环。</p></div>
+        <div className="loop-badge"><span>闭环完成率</span><b>78.6%</b><i><em /></i><small>本周 +9.4pp</small></div>
+      </section>
+
+      <div className="strategy-toolbar">
+        <label><span>当前策略</span><select value={strategyId} onChange={(event) => setStrategyId(event.target.value as StrategyId)}><option value="A">策略 A · 少数位置分布</option><option value="B">策略 B · 多片段异常</option></select></label>
+        <div><span className="live-dot" />演示批次 B-2407-W4</div>
+        <button onClick={() => showToast("策略配置已打开（演示环境只读）")}>查看策略口径</button>
+      </div>
+
+      <nav className="strategy-stepper" aria-label="策略闭环步骤">
+        {strategySteps.map((step, index) => (
+          <button key={step.id} className={strategyStep === step.id ? "active" : ""} onClick={() => setStrategyStep(step.id)}>
+            <span>{step.index}</span><div><b>{step.label}</b><small>{step.hint}</small></div>{index < strategySteps.length - 1 && <i>→</i>}
+          </button>
+        ))}
+      </nav>
+
+      <section className="strategy-context">
+        <div><span>策略说明</span><b>{strategyCopy[strategyId].title}</b><p>{strategyCopy[strategyId].summary}</p></div>
+        <div><span>识别口径</span><p>{strategyCopy[strategyId].rule}</p></div>
+        <div><span>本批命中</span><b>{strategyCopy[strategyId].hits}</b></div>
+      </section>
+
+      {strategyStep === "discover" && (
+        <>
+          <section className="stage-heading"><span>STEP 01</span><div><h3>异常发现</h3><p>先固化分析批次，再运行策略并抽取可跟台样本。</p></div><button className="quiet-button" onClick={() => showToast("已创建演示批次 B-2407-W5")}>＋ 新建批次</button></section>
+          <article className="panel batch-panel">
+            <PanelTitle kicker="BATCH MANAGEMENT" title="分析批次" text="批次保存周次、团队、队列与创建人，提交后形成可追溯快照。" />
+            <div className="batch-table">
+              <div className="batch-row active"><span><i />当前</span><b>B-2407-W4</b><p>07/18–07/24</p><p>全部团队</p><p>全部队列</p><em>已跑策略</em><strong>86 样本</strong><button onClick={() => showToast("当前批次已选中")}>打开</button></div>
+              <div className="batch-row"><span>历史</span><b>B-2407-W3</b><p>07/11–07/17</p><p>团队 A / C</p><p>队列 02</p><em>已提交</em><strong>63 样本</strong><button onClick={() => showToast("已切换历史批次（演示）")}>查看</button></div>
+            </div>
+          </article>
+          <article className="panel sample-panel">
+            <PanelTitle
+              kicker="ANOMALY DISCOVERY"
+              title="候选异常与样本抽取"
+              text={strategyId === "A" ? "定位与标签主导方式相反的少数位置样本。" : "定位同元素、同标签下片段数量超过阈值的异常样本。"}
+              action={<div className="sample-actions"><span>已选 {checkedSamples.length} 条</span><button className="primary-button" onClick={addTrackedSamples}>加入跟台</button></div>}
+            />
+            <div className="discovery-summary">
+              <div><span>候选标签 / 元素</span><b>{strategyId === "A" ? "12" : "18"}</b><small>命中策略规则</small></div>
+              <div><span>候选样本</span><b>{strategyId === "A" ? "86" : "64"}</b><small>去重后记录</small></div>
+              <div><span>建议抽样</span><b>20</b><small>支持 10–60 条</small></div>
+              <button onClick={() => showToast("策略已重新运行，候选池无变化")}>↻ 重新运行策略</button>
+            </div>
+            <div className="table-wrap"><table><thead><tr><th><input type="checkbox" checked={checkedSamples.length === strategySamples.length} onChange={(event) => setCheckedSamples(event.target.checked ? strategySamples.map((sample) => sample.id) : [])} /></th><th>样本 ID</th><th>脱敏标签</th><th>队列 / 审核员</th><th>异常信号</th><th>标记组合</th><th>片段数</th><th>风险</th><th /></tr></thead><tbody>
+              {strategySamples.map((sample) => <tr key={sample.id}><td><input type="checkbox" checked={checkedSamples.includes(sample.id)} onChange={(event) => setCheckedSamples((current) => event.target.checked ? [...current, sample.id] : current.filter((id) => id !== sample.id))} /></td><td className="mono">{sample.id}</td><td>{sample.label}</td><td><b>{sample.channel}</b><small className="cell-note">{sample.auditor}</small></td><td>{strategyId === "A" ? sample.signal : `${sample.segments} 个片段 / 元素`}</td><td><span className="soft-pill">{sample.marker}</span></td><td>{sample.segments}</td><td><span className={`risk risk-${sample.risk}`}>{sample.risk}</span></td><td><button className="link-button" onClick={() => setSelectedSample(sample)}>查看样本</button></td></tr>)}
+            </tbody></table></div>
+            <div className="stage-next"><span>已加入跟台池 {trackedSamples.length} 条</span><button onClick={() => setStrategyStep("define")}>下一步：问题定义 →</button></div>
+          </article>
+        </>
+      )}
+
+      {strategyStep === "define" && (
+        <>
+          <section className="stage-heading"><span>STEP 02</span><div><h3>问题定义</h3><p>逐条核对录屏，填写问题分类和跟台记录；相同记录会自动聚合为同一个问题。</p></div><div className="heading-actions"><button className="quiet-button" onClick={() => showToast("已下载脱敏问题定义模板")}>↓ 下载模板</button><button className="quiet-button" onClick={() => showToast("演示文件校验通过，已模拟回传")}>↑ 回传 Excel</button></div></section>
+          <section className="grid two-one define-summary">
+            <article className="panel">
+              <PanelTitle kicker="TRACKING PROGRESS" title="跟台完成进度" />
+              <div className="progress-overview"><div><b>{tracked.filter((sample) => definitions[sample.id]?.viewed).length}</b><span>/ {tracked.length} 已看录屏</span></div><i><em style={{ width: `${(tracked.filter((sample) => definitions[sample.id]?.viewed).length / Math.max(tracked.length, 1)) * 100}%` }} /></i><p>{tracked.filter((sample) => definitions[sample.id]?.category && definitions[sample.id]?.record).length} 条已完成归因 · {problems.length} 个聚合问题</p></div>
+            </article>
+            <article className="panel template-panel">
+              <PanelTitle kicker="QUICK TEMPLATE" title="快捷跟台模板" />
+              <select onChange={(event) => { const template = quickTemplates[Number(event.target.value)]; if (template && tracked[0]) updateDefinition(tracked[0].id, template); }} defaultValue=""><option value="" disabled>选择模板应用到首条样本</option>{quickTemplates.map((template, index) => <option value={index} key={template.record}>{template.category} · {template.record}</option>)}</select>
+            </article>
+          </section>
+          <article className="panel table-panel definition-table">
+            <PanelTitle kicker="PROBLEM DEFINITION" title="跟台记录工作台" text="系统字段只读；问题分类与跟台记录支持在线填写或 Excel 回传。" action={<button className="primary-button" onClick={submitDefinitions}>提交本版定义</button>} />
+            <div className="table-wrap"><table><thead><tr><th>样本</th><th>标签 / 审核员</th><th>已看录屏</th><th>问题分类</th><th>跟台记录</th><th>聚合提示</th><th /></tr></thead><tbody>
+              {tracked.map((sample) => {
+                const definition = definitions[sample.id] ?? { viewed: false, category: "", record: "" };
+                const sameCount = tracked.filter((other) => definitions[other.id]?.record && definitions[other.id]?.record === definition.record && definitions[other.id]?.category === definition.category).length;
+                return <tr key={sample.id}><td><span className="mono">{sample.id}</span><small className="cell-note">{sample.marker}</small></td><td><b>{sample.label}</b><small className="cell-note">{sample.auditor}</small></td><td><label className="check-control"><input type="checkbox" checked={definition.viewed} onChange={(event) => updateDefinition(sample.id, { viewed: event.target.checked })} /><span>{definition.viewed ? "已核对" : "待核对"}</span></label></td><td><select value={definition.category} onChange={(event) => updateDefinition(sample.id, { category: event.target.value })}><option value="">请选择</option>{problemCategories.map((category) => <option key={category}>{category}</option>)}</select></td><td><textarea value={definition.record} placeholder="填写可行动的问题描述…" onChange={(event) => updateDefinition(sample.id, { record: event.target.value })} /></td><td>{sameCount > 1 ? <span className="merge-hint">⇄ 将聚合 {sameCount} 条样本</span> : <span className="muted">独立问题</span>}</td><td><button className="link-button" onClick={() => setSelectedSample(sample)}>样本</button></td></tr>;
+              })}
+            </tbody></table></div>
+          </article>
+          <article className="panel submission-history">
+            <PanelTitle kicker="VERSION TIMELINE" title="提交版本与快照" text="每次提交都会保存全部样本的定义，可撤回后继续修改。" />
+            <div className="version-line">{submissions.map((submission, index) => <div key={submission.id}><i className={index === submissions.length - 1 ? "current" : ""} /><span>{submission.time}</span><b>{submission.note}</b><p>{submission.count} 条完成归因</p><button onClick={() => showToast(index === submissions.length - 1 ? "当前版本无需切换" : `已预览第 ${submission.id} 版快照`)}>{index === submissions.length - 1 ? "当前版本" : "查看快照"}</button></div>)}</div>
+            <div className="stage-next"><span>问题定义完成后，按“问题”而不是按“样本”推进解决。</span><button onClick={() => setStrategyStep("solve")}>下一步：问题解决 →</button></div>
+          </article>
+        </>
+      )}
+
+      {strategyStep === "solve" && (
+        <>
+          <section className="stage-heading"><span>STEP 03</span><div><h3>问题解决</h3><p>相同分类与跟台记录自动聚合。产品、规则、SOP 类问题可沉淀至全局问题池。</p></div></section>
+          <div className="solution-tabs"><button className={solutionTab === "batch" ? "active" : ""} onClick={() => setSolutionTab("batch")}>本批次问题 <span>{problems.length}</span></button><button className={solutionTab === "global" ? "active" : ""} onClick={() => setSolutionTab("global")}>全局问题池 <span>3</span></button></div>
+          {solutionTab === "batch" ? (
+            <div className="problem-list">
+              {problems.map((problem, problemIndex) => {
+                const flow = getFlow(problem.category);
+                const index = resolutionIndex[problem.key] ?? (problemIndex === 0 ? 1 : 0);
+                const status = flow[Math.min(index, flow.length - 1)];
+                return <article className="problem-card" key={problem.key}>
+                  <header><div><span className="mono">P-{String(problemIndex + 1).padStart(3, "0")}</span><em className={problem.category.includes("人审") ? "human" : "global"}>{problem.category}</em><b>{problem.record}</b></div><span className={`deadline ${problemIndex === 2 ? "overdue" : ""}`}>{problemIndex === 2 ? "已逾期 1 天" : "DDL 07/26"}</span></header>
+                  <div className="problem-meta"><span>关联样本 <b>{problem.sampleIds.length}</b></span><span>{problem.sampleIds.join(" · ")}</span>{!problem.category.includes("人审") && <span>可进入全局问题池</span>}</div>
+                  <div className="status-flow">
+                    {flow.map((item, flowIndex) => <div key={item} className={flowIndex < index ? "done" : flowIndex === index ? "current" : ""}><i>{flowIndex < index ? "✓" : flowIndex + 1}</i><span>{item}</span>{flowIndex < flow.length - 1 && <b />}</div>)}
+                  </div>
+                  <footer><span>当前状态：<b>{status}</b></span><div><button disabled={index <= 0} onClick={() => setResolutionIndex((current) => ({ ...current, [problem.key]: Math.max(0, index - 1) }))}>撤回一步</button><button onClick={() => showToast("问题已标记为放弃，可在操作日志中恢复")}>放弃</button><button className="primary-button" disabled={index >= flow.length - 1} onClick={() => { setResolutionIndex((current) => ({ ...current, [problem.key]: Math.min(flow.length - 1, index + 1) })); showToast(`问题已推进至：${flow[Math.min(flow.length - 1, index + 1)]}`); }}>推进状态 →</button></div></footer>
+                </article>;
+              })}
+              {problems.length === 0 && <article className="panel"><EmptyDemo text="请先在问题定义中完成归因" /></article>}
+            </div>
+          ) : (
+            <article className="panel global-pool">
+              <PanelTitle kicker="GLOBAL ISSUE POOL" title="跨批次全局问题池" text="统一沉淀产品、规则和 SOP 类共性问题，支持关联、合并与跨批次追踪。" action={<button className="primary-button" onClick={() => showToast("已创建一条演示全局问题")}>＋ 新建问题</button>} />
+              {[
+                { id: "G-001", category: "产品问题", title: "复核视图中的识别信号展示不完整", batches: 4, samples: 18, owner: "产品协同角色" },
+                { id: "G-002", category: "规则问题", title: "组合信号的审核优先级需要统一", batches: 3, samples: 11, owner: "规则协同角色" },
+                { id: "G-003", category: "SOP 不清晰", title: "长内容全程命中时的操作路径不明确", batches: 2, samples: 7, owner: "运营协同角色" },
+              ].map((problem) => <div className="global-row" key={problem.id}><span className="mono">{problem.id}</span><div><em>{problem.category}</em><b>{problem.title}</b><small>关联 {problem.batches} 个批次 · {problem.samples} 条样本 · {problem.owner}</small></div><select value={globalStatus[problem.id]} onChange={(event) => setGlobalStatus((current) => ({ ...current, [problem.id]: event.target.value }))}><option>未解决</option><option>处理中</option><option>已解决</option><option>已终止</option></select><button onClick={() => showToast(`已打开 ${problem.id} 的描述、截图与关联记录`)}>查看详情</button></div>)}
+              <div className="pool-actions"><button onClick={() => showToast("已模拟关联当前批次问题")}>关联批次问题</button><button onClick={() => showToast("请选择至少两条全局问题后合并")}>合并问题</button><button onClick={() => showToast("已打开描述与截图编辑器")}>编辑描述 / 截图</button></div>
+            </article>
+          )}
+          <div className="stage-next standalone"><span>解决状态和操作日志会进入效率监测。</span><button onClick={() => setStrategyStep("monitor")}>下一步：数据监测 →</button></div>
+        </>
+      )}
+
+      {strategyStep === "monitor" && (
+        <>
+          <section className="stage-heading"><span>STEP 04</span><div><h3>数据监测</h3><p>持续验证策略质量、问题归因结构与解决效率，形成下一轮策略输入。</p></div></section>
+          <nav className="monitor-tabs">{(["quality", "attribution", "efficiency"] as MonitorView[]).map((view) => <button key={view} className={monitorView === view ? "active" : ""} onClick={() => setMonitorView(view)}>{view === "quality" ? "质量监测" : view === "attribution" ? "归因监测" : "效率监测"}<span>{view === "quality" ? "策略 + 质量指标" : view === "attribution" ? "问题结构与解决率" : "进度、逾期与状态"}</span></button>)}</nav>
+          {monitorView === "quality" && (
+            <>
+              <section className="metric-grid four"><MetricCard label="策略异常率" value="6.8%" delta="-2.1%" detail="少数位置 / 多片段" tone="rose" /><MetricCard label="IoU" value="88.6%" delta="+3.4%" detail="干预后质量" /><MetricCard label="综合准确率" value="92.1%" delta="+2.6%" detail="标签与段落" tone="cyan" /><MetricCard label="短耗时占比" value="2.2%" delta="-0.9%" detail="极端操作" tone="amber" /></section>
+              <section className="grid two-one"><article className="panel"><PanelTitle kicker="INTERVENTION EFFECT" title="策略异常率与准确率趋势" text="用干预点验证策略是否真正改善质量。" /><LineChart series={[{ name: "综合准确率", color: "#7357ff", values: [86, 87, 87.8, 88.2, 89.6, 90.8, 92.1] }, { name: "异常率反向值", color: "#15a98c", values: [84, 85.1, 86.3, 87.2, 89, 91.2, 93.2] }]} /></article><article className="panel"><PanelTitle kicker="IMPACT" title="干预效果摘要" /><div className="impact-card"><span>07/21</span><b>完成本轮宣讲与规则移交</b><p>之后 3 天策略异常率下降 2.1pp，综合准确率提升 2.6pp。</p></div><div className="impact-card muted-card"><span>下一动作</span><b>继续观察队列 04</b><p>该队列的多片段异常仍高于整体 1.8pp。</p></div></article></section>
+            </>
+          )}
+          {monitorView === "attribution" && (
+            <>
+              <section className="metric-grid four"><MetricCard label="问题总数" value="24" delta="+5" detail="本周期新增" tone="ink" /><MetricCard label="人审相关" value="33.3%" detail="执行 + 理解" tone="amber" /><MetricCard label="产品 / 规则" value="58.3%" detail="进入协同链路" /><MetricCard label="已解决率" value="70.8%" delta="+12.5%" detail="含全局问题" tone="cyan" /></section>
+              <section className="grid equal"><article className="panel"><PanelTitle kicker="CATEGORY TREND" title="问题分类趋势" text="观察问题结构是否从人审转向产品或规则。" /><LineChart suffix="个" minValue={0} series={[{ name: "产品 / 规则", color: "#7357ff", values: [3, 5, 4, 6, 8, 7, 9] }, { name: "人审", color: "#eda43f", values: [8, 7, 7, 6, 5, 4, 3] }]} /></article><article className="panel"><PanelTitle kicker="CATEGORY SHARE" title="本周期归因构成" /><div className="category-share">{[["产品问题", 29], ["规则问题", 21], ["人审执行", 17], ["人审理解", 16], ["SOP 类", 13], ["无问题", 4]].map(([name, value]) => <div key={String(name)}><span>{name}</span><i><b style={{ width: `${Number(value) * 2.8}%` }} /></i><strong>{value}%</strong></div>)}</div></article></section>
+            </>
+          )}
+          {monitorView === "efficiency" && (
+            <>
+              <section className="metric-grid four"><MetricCard label="问题解决率" value="70.8%" delta="+12.5%" detail="已完成 / 总问题" tone="cyan" /><MetricCard label="逾期率" value="8.3%" delta="-4.2%" detail="超过 DDL" tone="rose" /><MetricCard label="平均推进率" value="68.2%" delta="+9.6%" detail="流程完成度" /><MetricCard label="平均解决时长" value="2.4天" delta="-0.7天" detail="从定义到完成" tone="amber" /></section>
+              <section className="grid two-one"><article className="panel"><PanelTitle kicker="SOLUTION EFFICIENCY" title="解决率、逾期率与推进率" /><LineChart series={[{ name: "解决率", color: "#15a98c", values: [42, 48, 53, 57, 61, 66, 70.8] }, { name: "推进率", color: "#7357ff", values: [38, 44, 49, 55, 59, 64, 68.2] }, { name: "逾期率反向值", color: "#e16a73", values: [82, 84, 85, 87, 88, 90, 91.7] }]} /></article><article className="panel"><PanelTitle kicker="STATUS SNAPSHOT" title="三类问题状态" /><div className="status-matrix">{[["产品", 2, 3, 6], ["人审", 1, 2, 5], ["规则 / SOP", 2, 2, 3]].map(([name, pending, active, done]) => <div key={String(name)}><b>{name}</b><span><i className="wait" />待处理 {pending}</span><span><i className="doing" />处理中 {active}</span><span><i className="done" />已完成 {done}</span></div>)}</div></article></section>
+            </>
+          )}
+          <article className="loop-complete"><div><span>闭环回流</span><h3>监测结果将成为下一轮异常发现的策略输入</h3><p>当异常率、归因结构或解决效率偏离目标时，系统建议调整策略阈值、抽样范围或协同动作。</p></div><button onClick={() => setStrategyStep("discover")}>返回异常发现 ↗</button></article>
+        </>
+      )}
+    </>
+  );
+
+  return (
+    <main className="app-shell">
+      <aside className="sidebar">
+        <button className="brand" onClick={() => switchMain("strategy")}><span className="brand-mark">A</span><span><b>Atlas</b><small>广告审核质量看板</small></span></button>
+        <div className="sidebar-label">DASHBOARD</div>
+        <nav className="main-nav" aria-label="主导航">
+          {mainTabs.map((tab) => <button key={tab.id} className={mainTab === tab.id ? "active" : ""} onClick={() => switchMain(tab.id)}><span>{tab.index}</span><div><b>{tab.label}</b><small>{tab.desc}</small></div>{tab.id === "strategy" && <em>CORE</em>}</button>)}
+        </nav>
+        <div className="sidebar-flow">
+          <span>策略闭环</span>
+          {strategySteps.map((step, index) => <button key={step.id} className={mainTab === "strategy" && strategyStep === step.id ? "active" : ""} onClick={() => { setMainTab("strategy"); setStrategyStep(step.id); }}><i>{index + 1}</i>{step.label}</button>)}
+        </div>
+        <div className="environment"><i /><div><b>公开演示环境</b><p>虚构数据 · 不连接公司系统</p></div></div>
+        <div className="privacy-card"><span>PRIVACY SAFE</span><p>真实标签、人员、渠道、阈值与业务明细均未进入本站。</p></div>
+      </aside>
+
+      <section className="main-area">
+        <header className="topbar">
+          <div><span>作品集 / 广告审核质量 / <b>{mainTabs.find((tab) => tab.id === mainTab)?.label}</b></span><h1>广告审核质量看板 · 脱敏演示</h1></div>
+          <div className="top-actions"><button onClick={() => showToast("已生成当前视图快照（演示）")}>导出快照</button><button onClick={resetDemo}>重置演示</button><button className="primary-button" onClick={() => setTourOpen(true)}>▶ 面试导览</button><span className="avatar">DE</span></div>
+        </header>
+        <div className="demo-banner"><span>DEMO ONLY</span><p>本站仅复现产品结构与交互逻辑，名称、数值、样本、策略阈值均为虚构。</p><i>数据更新于 2 分钟前</i></div>
+        <div className="content">
+          {mainTab === "base" && renderBase()}
+          {mainTab === "quality" && renderQuality()}
+          {mainTab === "strategy" && renderStrategy()}
+          <footer><div><span className="brand-mark small">A</span><b>Atlas Portfolio Demo</b></div><p>广告审核质量看板 · 三类数据 · 一条改进闭环</p><span>All data is simulated</span></footer>
         </div>
       </section>
 
-      {selectedRow && (
-        <div className="drawer-layer" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedRow(null); }}>
-          <aside className="detail-drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
-            <div className="drawer-top">
-              <div>
-                <span className="panel-kicker">SAMPLE REVIEW</span>
-                <h2 id="drawer-title">样本复核详情</h2>
-              </div>
-              <button className="close-button" onClick={() => setSelectedRow(null)} aria-label="关闭详情">×</button>
-            </div>
-            <div className="drawer-id">
-              <span className="mono">{selectedRow.id}</span>
-              <span className={`severity severity-${selectedRow.severity}`}>{selectedRow.severity}优先级</span>
-            </div>
-            <div className="drawer-metrics">
-              <div><span>质量分</span><b>{selectedRow.score}</b></div>
-              <div><span>内容时长</span><b>{selectedRow.duration}</b></div>
-              <div><span>异常类型</span><b>{selectedRow.type}</b></div>
-            </div>
-            <section className="sample-preview">
-              <div className="preview-header">
-                <span>虚构内容预览</span>
-                <span className="privacy-label">已脱敏</span>
-              </div>
-              <div className="fake-media">
-                <span className="play-large">▶</span>
-                <div className="media-wave">
-                  {[22, 46, 34, 68, 42, 78, 54, 31, 64, 48, 72, 38, 56, 28, 63, 44, 74, 36].map((value, index) => (
-                    <i key={`${value}-${index}`} style={{ height: `${value}%` }} />
-                  ))}
-                </div>
-                <span className="mono media-time">00:24 / {selectedRow.duration}</span>
-              </div>
-              <div className="range-line"><i /><b style={{ left: "22%", width: "31%" }} /></div>
-            </section>
-            <section className="evidence">
-              <h3>判定依据</h3>
-              <div className="evidence-card">
-                <span className="evidence-tag">规则信号</span>
-                <p>示例信号在 00:24–00:56 区间发生明显偏移，与基准边界相差 3.2 秒。</p>
-              </div>
-              <div className="evidence-card">
-                <span className="evidence-tag model">模型建议</span>
-                <p>建议缩短区间并进入二次复核。该结论仅用于演示交互，不代表真实判断。</p>
-              </div>
-            </section>
-            <section className="timeline">
-              <h3>处理轨迹</h3>
-              <div><i className="done" /><b>系统识别异常</b><span>09:42</span></div>
-              <div><i className="done" /><b>进入复核队列</b><span>09:43</span></div>
-              <div><i /><b>等待人工确认</b><span>当前</span></div>
-            </section>
-            <div className="drawer-actions">
-              <button className="ghost-button" onClick={() => setSelectedRow(null)}>暂不处理</button>
-              <button className="primary-button" onClick={reviewSelected}>标记已复核</button>
-            </div>
-          </aside>
+      {selectedSample && (
+        <div className="modal-layer" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedSample(null); }}>
+          <section className="sample-drawer" role="dialog" aria-modal="true" aria-labelledby="sample-title">
+            <header><div><span>SAMPLE EVIDENCE · DESENSITIZED</span><h2 id="sample-title">异常样本详情</h2></div><button onClick={() => setSelectedSample(null)}>×</button></header>
+            <div className="sample-id"><span className="mono">{selectedSample.id}</span><em className={`risk risk-${selectedSample.risk}`}>{selectedSample.risk}风险</em></div>
+            <div className="fake-video"><div className="video-grid" /><span>▶</span><b>虚构视频预览</b><small>00:36 / {selectedSample.duration}</small></div>
+            <div className="segment-track"><span>0s</span><i><em style={{ left: "8%", width: "24%" }} /><em style={{ left: "39%", width: "17%" }} /><em style={{ left: "64%", width: "28%" }} /></i><span>{selectedSample.duration}</span></div>
+            <div className="sample-facts"><div><span>脱敏标签</span><b>{selectedSample.label}</b></div><div><span>标记组合</span><b>{selectedSample.marker}</b></div><div><span>异常信号</span><b>{strategyId === "A" ? selectedSample.signal : `${selectedSample.segments} 个片段`}</b></div><div><span>队列 / 角色</span><b>{selectedSample.channel} · {selectedSample.auditor}</b></div></div>
+            <div className="evidence-box"><span>判定证据</span><p>{strategyId === "A" ? "该标签在当前队列以 ASR 标记为主，本样本采用少数位置方式，且同时出现辅助信号，建议通过录屏确认操作路径。" : "同一元素、同一标签下出现多段相邻片段，数量超过策略阈值，需要区分产品重叠、合理重复或人工操作问题。"}</p></div>
+            <div className="drawer-actions"><button onClick={() => setSelectedSample(null)}>关闭</button><button className="primary-button" onClick={() => { setTrackedSamples((current) => Array.from(new Set([...current, selectedSample.id]))); setSelectedSample(null); showToast("样本已加入跟台池"); }}>加入跟台池</button></div>
+          </section>
         </div>
       )}
 
-      {guideOpen && (
-        <div className="guide-layer" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setGuideOpen(false); }}>
-          <section className="guide-card" role="dialog" aria-modal="true" aria-labelledby="guide-title">
-            <button className="close-button guide-close" onClick={() => setGuideOpen(false)} aria-label="关闭导览">×</button>
-            <div className="guide-progress">
-              {guideSteps.map((_, index) => <i key={index} className={index <= guideStep ? "active" : ""} />)}
-            </div>
-            <div className="guide-number">{String(guideStep + 1).padStart(2, "0")}</div>
-            <span className="section-kicker">{guideSteps[guideStep].eyebrow}</span>
-            <h2 id="guide-title">{guideSteps[guideStep].title}</h2>
-            <p>{guideSteps[guideStep].text}</p>
-            <div className="guide-actions">
-              <button
-                className="ghost-button"
-                onClick={() => setGuideStep((current) => Math.max(0, current - 1))}
-                disabled={guideStep === 0}
-              >
-                上一步
-              </button>
-              <button
-                className="primary-button"
-                onClick={() => {
-                  if (guideStep === guideSteps.length - 1) {
-                    setGuideOpen(false);
-                    scrollTo("quality");
-                  } else {
-                    setGuideStep((current) => current + 1);
-                  }
-                }}
-              >
-                {guideStep === guideSteps.length - 1 ? "开始体验" : "下一步"}
-              </button>
+      {tourOpen && (
+        <div className="modal-layer tour-layer" onMouseDown={(event) => { if (event.target === event.currentTarget) setTourOpen(false); }}>
+          <section className="tour-card" role="dialog" aria-modal="true">
+            <button className="tour-close" onClick={() => setTourOpen(false)}>×</button>
+            <span className="eyebrow">INTERVIEW WALKTHROUGH · 3–5 MIN</span>
+            <h2>建议这样讲这份项目</h2>
+            <p>先用基础与质量页说明数据底座，再进入策略页完成一次“发现—定义—解决—监测”的演示。</p>
+            <div className="tour-steps">
+              <button onClick={() => { setMainTab("base"); setBaseView("overview"); setTourOpen(false); }}><span>01</span><b>基础数据</b><p>统一片段、元素、标签和标记方式口径。</p></button>
+              <button onClick={() => { setMainTab("quality"); setQualityView("metrics"); setTourOpen(false); }}><span>02</span><b>质量数据</b><p>用趋势、交叉热力和异常时长定位问题。</p></button>
+              <button onClick={() => { setMainTab("strategy"); setStrategyStep("discover"); setTourOpen(false); }}><span>03</span><b>策略闭环</b><p>抽样、跟台、聚合问题并推进解决。</p></button>
+              <button onClick={() => { setMainTab("strategy"); setStrategyStep("monitor"); setTourOpen(false); }}><span>04</span><b>效果验证</b><p>用质量、归因和效率指标验证改进。</p></button>
             </div>
           </section>
         </div>
@@ -668,5 +855,35 @@ export default function Home() {
 
       {toast && <div className="toast" role="status"><span>✓</span>{toast}</div>}
     </main>
+  );
+}
+
+function Filters({
+  period,
+  setPeriod,
+  team,
+  setTeam,
+  channel,
+  setChannel,
+  label,
+  setLabel,
+}: {
+  period: string;
+  setPeriod: (value: string) => void;
+  team: string;
+  setTeam: (value: string) => void;
+  channel: string;
+  setChannel: (value: string) => void;
+  label: string;
+  setLabel: (value: string) => void;
+}) {
+  return (
+    <section className="filter-bar">
+      <label><span>时间范围</span><select value={period} onChange={(event) => setPeriod(event.target.value)}><option>近 7 天</option><option>近 30 天</option><option>本季度</option></select></label>
+      <label><span>团队</span><select value={team} onChange={(event) => setTeam(event.target.value)}><option>全部团队</option><option>团队 A</option><option>团队 B</option><option>团队 C</option><option>团队 D</option></select></label>
+      <label><span>队列</span><select value={channel} onChange={(event) => setChannel(event.target.value)}><option>全部队列</option><option>队列 01</option><option>队列 02</option><option>队列 03</option><option>队列 04</option></select></label>
+      <label className="grow"><span>标签</span><select value={label} onChange={(event) => setLabel(event.target.value)}><option>全部标签</option><option>标签组 A</option><option>标签组 B</option><option>标签组 C</option><option>标签组 D</option></select></label>
+      <div className="filter-status"><i />筛选已同步</div>
+    </section>
   );
 }
