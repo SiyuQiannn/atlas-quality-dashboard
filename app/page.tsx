@@ -8,6 +8,9 @@ type QualityView = "metrics" | "duration";
 type StrategyStep = "discover" | "define" | "solve" | "monitor";
 type MonitorView = "quality" | "attribution" | "efficiency";
 type StrategyId = "A" | "B";
+type DrillDimension = "label" | "team" | "channel";
+type DominanceMode = "asr" | "manual";
+type ElementStat = "mean" | "max" | "min";
 type Sample = (typeof strategySamples)[number];
 type Definition = { viewed: boolean; category: string; record: string };
 type ChartSeries = { name: string; color: string; values: number[] };
@@ -47,13 +50,49 @@ const baseRows = [
   { label: "标签组 D-03", channel: "队列 02", segments: 6690, manual: 3712, asr: 2978, frame: 54, ocr: 147, elements: 3481 },
 ];
 
+const overviewDrillRows: Record<DrillDimension, Array<{ name: string; secondary: string; segments: number; manual: number; asr: number; frame: number; ocr: number; elements: number; feature: string }>> = {
+  label: baseRows.map((row) => ({
+    name: row.label,
+    secondary: row.channel,
+    segments: row.segments,
+    manual: row.manual,
+    asr: row.asr,
+    frame: row.frame,
+    ocr: row.ocr,
+    elements: row.elements,
+    feature: row.asr / row.segments >= 0.7 ? "ASR 主导" : row.manual / row.segments >= 0.7 ? "纯人工主导" : "无明显分布",
+  })),
+  team: [
+    { name: "团队 A", secondary: "4 个通道", segments: 192840, manual: 76840, asr: 116000, frame: 12940, ocr: 9680, elements: 84210, feature: "ASR 主导" },
+    { name: "团队 B", secondary: "3 个通道", segments: 168420, manual: 82160, asr: 86260, frame: 10820, ocr: 7340, elements: 71680, feature: "均衡分布" },
+    { name: "团队 C", secondary: "4 个通道", segments: 174960, manual: 73640, asr: 101320, frame: 11760, ocr: 8120, elements: 76540, feature: "ASR 主导" },
+    { name: "团队 D", secondary: "2 个通道", segments: 151780, manual: 74260, asr: 77520, frame: 9420, ocr: 6950, elements: 63570, feature: "均衡分布" },
+  ],
+  channel: [
+    { name: "通道 01", secondary: "4 个团队", segments: 186420, manual: 69420, asr: 117000, frame: 13840, ocr: 8750, elements: 80620, feature: "ASR 主导" },
+    { name: "通道 02", secondary: "4 个团队", segments: 178960, manual: 88560, asr: 90400, frame: 10420, ocr: 7920, elements: 74680, feature: "均衡分布" },
+    { name: "通道 03", secondary: "3 个团队", segments: 164780, manual: 68420, asr: 96360, frame: 11360, ocr: 7140, elements: 69840, feature: "ASR 主导" },
+    { name: "通道 04", secondary: "3 个团队", segments: 157840, manual: 80480, asr: 77360, frame: 9320, ocr: 8280, elements: 70860, feature: "均衡分布" },
+  ],
+};
+
 const labelGroups = [
-  { label: "标签组 A-01", kind: "ASR 主导", current: 81, previous: 74, volume: 12840 },
-  { label: "标签组 B-04", kind: "ASR 主导", current: 76, previous: 79, volume: 10926 },
-  { label: "标签组 C-02", kind: "手打主导", current: 72, previous: 61, volume: 8942 },
-  { label: "标签组 D-03", kind: "手打主导", current: 70, previous: 73, volume: 6690 },
-  { label: "标签组 A-07", kind: "无明显分布", current: 58, previous: 69, volume: 7816 },
-  { label: "标签组 E-05", kind: "无明显分布", current: 54, previous: 48, volume: 5240 },
+  { label: "标签组 A-01", previousKind: "无明显分布", currentKind: "ASR 主导", current: 81, previous: 64, volume: 12840, previousSegments: 10820, currentSegments: 12840 },
+  { label: "标签组 B-04", previousKind: "ASR 主导", currentKind: "ASR 主导", current: 76, previous: 79, volume: 10926, previousSegments: 9980, currentSegments: 10926 },
+  { label: "标签组 C-02", previousKind: "无明显分布", currentKind: "纯人工主导", current: 72, previous: 61, volume: 8942, previousSegments: 7620, currentSegments: 8942 },
+  { label: "标签组 D-03", previousKind: "纯人工主导", currentKind: "纯人工主导", current: 70, previous: 73, volume: 6690, previousSegments: 6380, currentSegments: 6690 },
+  { label: "标签组 A-07", previousKind: "ASR 主导", currentKind: "无明显分布", current: 58, previous: 72, volume: 7816, previousSegments: 7040, currentSegments: 7816 },
+  { label: "标签组 E-05", previousKind: "纯人工主导", currentKind: "无明显分布", current: 54, previous: 71, volume: 5240, previousSegments: 4810, currentSegments: 5240 },
+];
+
+const concentricRows = [
+  { mode: "asr", layer: "内层", label: "标签组 A-01", global: "ASR 主导", dominantChannels: "4 / 4", elements: 6210, segments: 12840 },
+  { mode: "asr", layer: "内层", label: "标签组 B-04", global: "ASR 主导", dominantChannels: "4 / 4", elements: 5748, segments: 10926 },
+  { mode: "asr", layer: "中层", label: "标签组 A-07", global: "ASR 主导", dominantChannels: "3 / 4", elements: 3982, segments: 7816 },
+  { mode: "asr", layer: "外层", label: "标签组 F-02", global: "无明显分布", dominantChannels: "1 / 4", elements: 3320, segments: 6410 },
+  { mode: "manual", layer: "内层", label: "标签组 C-02", global: "纯人工主导", dominantChannels: "4 / 4", elements: 4316, segments: 8942 },
+  { mode: "manual", layer: "中层", label: "标签组 D-03", global: "纯人工主导", dominantChannels: "3 / 4", elements: 3481, segments: 6690 },
+  { mode: "manual", layer: "外层", label: "标签组 E-05", global: "无明显分布", dominantChannels: "2 / 4", elements: 2840, segments: 5240 },
 ];
 
 const elementRows = [
@@ -65,13 +104,10 @@ const elementRows = [
 ];
 
 const qualityMetrics = {
-  iou: { label: "IoU", value: "86.4%", delta: "+2.1%", color: "#7357ff", values: [80.2, 82.8, 81.9, 84.6, 85.1, 87.2, 86.4] },
-  correct: { label: "正确打标率", value: "92.7%", delta: "+1.3%", color: "#15a98c", values: [89.1, 89.8, 90.6, 91.2, 91.0, 92.1, 92.7] },
-  match: { label: "标签匹配度", value: "94.1%", delta: "+0.8%", color: "#3687e8", values: [91.8, 92.4, 92.1, 93.0, 93.4, 93.7, 94.1] },
-  precision: { label: "段落精准率", value: "88.9%", delta: "+1.7%", color: "#f0a33a", values: [84.3, 85.8, 86.6, 87.1, 86.9, 88.2, 88.9] },
-  accuracy: { label: "综合准确率", value: "90.8%", delta: "+1.5%", color: "#d85d84", values: [86.9, 87.6, 88.4, 88.1, 89.3, 90.2, 90.8] },
-  repeat: { label: "简单重复差异", value: "1.8%", delta: "-0.6%", color: "#7c889d", values: [3.8, 3.4, 3.1, 2.9, 2.6, 2.2, 1.8] },
-  fast: { label: "极端短耗时占比", value: "2.4%", delta: "-0.4%", color: "#e46c5f", values: [4.3, 4.0, 3.8, 3.1, 3.2, 2.7, 2.4] },
+  iou: { label: "IoU", value: "86.4%", delta: "+2.1%", color: "#2448a8", values: [80.2, 82.8, 81.9, 84.6, 85.1, 87.2, 86.4] },
+  correct: { label: "正确打标率", value: "92.7%", delta: "+1.3%", color: "#008f83", values: [89.1, 89.8, 90.6, 91.2, 91.0, 92.1, 92.7] },
+  repeat: { label: "简单重复差异", value: "1.8%", delta: "-0.6%", color: "#c47a15", values: [3.8, 3.4, 3.1, 2.9, 2.6, 2.2, 1.8] },
+  time: { label: "平均审核耗时", value: "41.6s", delta: "-3.2s", color: "#7358a6", values: [48.6, 47.2, 46.8, 45.1, 44.7, 42.9, 41.6] },
 };
 
 const heatmap = [
@@ -231,7 +267,14 @@ function LineChart({
     return () => window.removeEventListener("resize", draw);
   }, [draw]);
 
-  return <canvas ref={ref} className="line-chart" role="img" aria-label={`${series.map((item) => item.name).join("、")}趋势图`} />;
+  return (
+    <div className="line-chart-frame">
+      <div className="chart-legend">
+        {series.map((item) => <span key={item.name}><i style={{ background: item.color }} />{item.name}</span>)}
+      </div>
+      <canvas ref={ref} className="line-chart" role="img" aria-label={`${series.map((item) => item.name).join("、")}趋势图`} />
+    </div>
+  );
 }
 
 function MetricCard({
@@ -311,10 +354,12 @@ export default function Home() {
   const [baseView, setBaseView] = useState<BaseView>("overview");
   const [qualityView, setQualityView] = useState<QualityView>("metrics");
   const [strategyStep, setStrategyStep] = useState<StrategyStep>("discover");
+  const [baseDrillDimension, setBaseDrillDimension] = useState<DrillDimension>("label");
+  const [dominanceMode, setDominanceMode] = useState<DominanceMode>("asr");
+  const [elementStat, setElementStat] = useState<ElementStat>("mean");
   const [monitorView, setMonitorView] = useState<MonitorView>("quality");
   const [strategyId, setStrategyId] = useState<StrategyId>("A");
   const [metricKey, setMetricKey] = useState<keyof typeof qualityMetrics>("iou");
-  const [qualityDimension, setQualityDimension] = useState<"team" | "channel" | "label">("team");
   const [durationReason, setDurationReason] = useState("全部");
   const [checkedSamples, setCheckedSamples] = useState<string[]>(["S-2407-01", "S-2407-02", "S-2407-03", "S-2407-04"]);
   const [trackedSamples, setTrackedSamples] = useState<string[]>(["S-2407-01", "S-2407-02", "S-2407-03", "S-2407-04"]);
@@ -365,8 +410,12 @@ export default function Home() {
     if (tab === "quality") setQualityView(id.replace("quality-", "") as QualityView);
     if (tab === "strategy") setStrategyStep(id.replace("strategy-", "") as StrategyStep);
     window.setTimeout(() => {
-      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 40);
+      const target = document.getElementById(id);
+      if (!target) return;
+      const fixedNavigationHeight = window.innerWidth <= 980 ? 96 : 172;
+      const top = target.getBoundingClientRect().top + window.scrollY - fixedNavigationHeight;
+      window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    }, 60);
   };
 
   const updateDefinition = (sampleId: string, patch: Partial<Definition>) => {
@@ -400,6 +449,9 @@ export default function Home() {
     setBaseView("overview");
     setQualityView("metrics");
     setStrategyStep("discover");
+    setBaseDrillDimension("label");
+    setDominanceMode("asr");
+    setElementStat("mean");
     setStrategyId("A");
     setCheckedSamples(["S-2407-01", "S-2407-02", "S-2407-03", "S-2407-04"]);
     setTrackedSamples(["S-2407-01", "S-2407-02", "S-2407-03", "S-2407-04"]);
@@ -430,48 +482,67 @@ export default function Home() {
 
       <section className={`module-section dashboard-view ${baseView === "overview" ? "active-view" : ""}`} id="base-overview">
         <ModuleHeader index="01" tag="DATA OVERVIEW" title="数据概览" text="汇总片段规模、元素规模、标记方式构成与标签/队列维度表现。" />
-          <section className="metric-grid five">
-            <MetricCard label="标记片段数" value="68.8万" delta="+8.4%" detail="环比上周期" tone="ink" />
-            <MetricCard label="元素数" value="29.6万" delta="+5.1%" detail="去重内容元素" />
-            <MetricCard label="ASR 片段" value="55.4%" delta="+1.7%" detail="主导标记方式" tone="cyan" />
-            <MetricCard label="手打片段" value="44.6%" delta="-1.7%" detail="片段人工选择" tone="amber" />
-            <MetricCard label="帧 / OCR 信号" value="1.36%" delta="+0.2%" detail="辅助信号占比" tone="rose" />
+          <section className="metric-grid six">
+            <MetricCard label="标记片段数" value="68.8万" delta="+8.4%" detail="去重后的物理片段总量" tone="ink" />
+            <MetricCard label="元素数" value="29.6万" delta="+5.1%" detail="去重后的广告物料数" />
+            <MetricCard label="纯人工片段" value="30.7万" delta="-1.7%" detail="打标 ASR 数为 0" tone="amber" />
+            <MetricCard label="ASR 片段" value="38.1万" delta="+1.7%" detail="打标 ASR 数大于 0" tone="cyan" />
+            <MetricCard label="视频帧数" value="4.9万" delta="+3.6%" detail="元素级辅助信号" tone="rose" />
+            <MetricCard label="OCR 数" value="3.6万" delta="+2.8%" detail="元素级文字信号" tone="ink" />
           </section>
-          <section className="grid two-one">
+          <section className="grid equal">
             <article className="panel">
-              <PanelTitle kicker="VOLUME TREND" title="片段与元素趋势" text="同一筛选条件下观察处理规模与内容规模。" action={<span className="legend-pair"><i className="violet" />片段 <i className="green" />元素</span>} />
+              <PanelTitle kicker="SEGMENT TREND" title="片段规模走势" text="总片段由 ASR 片段与纯人工片段构成。" />
               <LineChart
                 suffix="万"
                 minValue={0}
                 series={[
-                  { name: "片段数", color: "#7357ff", values: [9.89, 10.48, 10.02, 10.21, 10.51, 9.43, 8.21] },
-                  { name: "元素数", color: "#15a98c", values: [4.12, 4.36, 4.19, 4.26, 4.42, 3.98, 3.72] },
+                  { name: "总片段", color: "#2448a8", values: [9.89, 10.48, 10.02, 10.21, 10.51, 9.43, 8.21] },
+                  { name: "ASR 片段", color: "#008f83", values: [5.43, 5.92, 5.67, 5.81, 5.98, 5.29, 4.62] },
+                  { name: "纯人工片段", color: "#c47a15", values: [4.46, 4.56, 4.35, 4.40, 4.53, 4.14, 3.59] },
+                ]}
+              />
+            </article>
+            <article className="panel">
+              <PanelTitle kicker="ELEMENT TREND" title="元素与辅助信号走势" text="帧与 OCR 为元素级信息，可与元素数对照观察。" />
+              <LineChart
+                suffix="万"
+                minValue={0}
+                series={[
+                  { name: "元素数", color: "#2448a8", values: [4.12, 4.36, 4.19, 4.26, 4.42, 3.98, 3.72] },
+                  { name: "视频帧", color: "#d25165", values: [0.62, 0.68, 0.65, 0.71, 0.76, 0.73, 0.75] },
+                  { name: "OCR", color: "#7358a6", values: [0.44, 0.49, 0.47, 0.51, 0.55, 0.53, 0.56] },
                 ]}
               />
             </article>
             <article className="panel signal-panel">
               <PanelTitle kicker="SIGNAL MIX" title="标记方式构成" text="片段类型只由 ASR 计数判断；帧与 OCR 作为元素辅助信号。" />
               <div className="donut-wrap">
-                <div className="donut" style={{ "--a": "55.4%", "--b": "44.6%" } as React.CSSProperties}><span><b>68.8万</b><small>总片段</small></span></div>
+                <div className="donut four-signal" style={{ background: "conic-gradient(#2448a8 0 49.3%, #008f83 49.3% 89%, #d25165 89% 95.3%, #7358a6 95.3% 100%)" }}><span><b>77.3万</b><small>标记信号总量</small></span></div>
                 <div className="donut-legend">
-                  <p><i className="violet" /><span>ASR 片段</span><b>55.4%</b></p>
-                  <p><i className="amber" /><span>手打片段</span><b>44.6%</b></p>
-                  <p><i className="cyan" /><span>包含 OCR</span><b>0.79%</b></p>
-                  <p><i className="rose" /><span>包含视频帧</span><b>0.57%</b></p>
+                  <p><i style={{ background: "#2448a8" }} /><span>ASR 片段</span><b>49.3% · 38.1万</b></p>
+                  <p><i style={{ background: "#008f83" }} /><span>纯人工片段</span><b>39.7% · 30.7万</b></p>
+                  <p><i style={{ background: "#d25165" }} /><span>视频帧</span><b>6.3% · 4.9万</b></p>
+                  <p><i style={{ background: "#7358a6" }} /><span>OCR</span><b>4.7% · 3.6万</b></p>
                 </div>
               </div>
             </article>
           </section>
           <article className="panel table-panel">
-            <PanelTitle kicker="DIMENSION DRILLDOWN" title="标签 × 队列下钻" text="可切换标签、队列、团队口径查看片段分布与元素规模。" action={<button className="quiet-button" onClick={() => showToast("数据表已导出")}>导出数据表</button>} />
+            <PanelTitle kicker="DIMENSION DRILLDOWN" title="打标位置三维下钻" text="按标签、团队、通道分别查看片段与信号构成。" action={<button className="quiet-button" onClick={() => showToast(`${baseDrillDimension === "label" ? "标签" : baseDrillDimension === "team" ? "团队" : "通道"}下钻表已导出`)}>导出当前表</button>} />
+            <nav className="data-table-tabs" aria-label="数据概览下钻维度">
+              <button className={baseDrillDimension === "label" ? "active" : ""} onClick={() => setBaseDrillDimension("label")}><b>BY 标签</b><span>203 个标签</span></button>
+              <button className={baseDrillDimension === "team" ? "active" : ""} onClick={() => setBaseDrillDimension("team")}><b>BY 团队</b><span>4 个团队</span></button>
+              <button className={baseDrillDimension === "channel" ? "active" : ""} onClick={() => setBaseDrillDimension("channel")}><b>BY 通道</b><span>4 个通道</span></button>
+            </nav>
             <div className="table-wrap">
               <table>
-                <thead><tr><th>标签</th><th>主要队列</th><th>片段数</th><th>手打片段</th><th>ASR 片段</th><th>帧 / OCR</th><th>分布</th><th>元素数</th><th /></tr></thead>
+                <thead><tr><th>{baseDrillDimension === "label" ? "标签" : baseDrillDimension === "team" ? "团队" : "通道"}</th><th>覆盖范围</th><th>片段数</th><th>纯人工片段</th><th>ASR 片段</th><th>视频帧</th><th>OCR</th><th>分布构成</th><th>元素数</th><th>分布特征</th></tr></thead>
                 <tbody>
-                  {baseRows.map((row) => (
-                    <tr key={row.label}>
-                      <td><b>{row.label}</b></td><td><span className="soft-pill">{row.channel}</span></td><td>{number(row.segments)}</td><td>{number(row.manual)}</td><td>{number(row.asr)}</td><td>{row.frame} / {row.ocr}</td>
-                      <td><div className="split-bar" title="ASR / 手打"><i style={{ width: `${(row.asr / row.segments) * 100}%` }} /><b /></div></td><td>{number(row.elements)}</td><td><button className="link-button" onClick={() => { setStrategyId("A"); selectModule("strategy", "strategy-discover"); }}>少数分布样本 →</button></td>
+                  {overviewDrillRows[baseDrillDimension].map((row) => (
+                    <tr key={row.name}>
+                      <td><b>{row.name}</b></td><td>{row.secondary}</td><td>{number(row.segments)}</td><td>{number(row.manual)}</td><td>{number(row.asr)}</td><td>{number(row.frame)}</td><td>{number(row.ocr)}</td>
+                      <td><div className="four-split-bar" title="ASR / 纯人工 / 帧 / OCR"><i style={{ width: `${(row.asr / (row.asr + row.manual + row.frame + row.ocr)) * 100}%` }} /><b style={{ width: `${(row.manual / (row.asr + row.manual + row.frame + row.ocr)) * 100}%` }} /><em style={{ width: `${(row.frame / (row.asr + row.manual + row.frame + row.ocr)) * 100}%` }} /><span style={{ width: `${(row.ocr / (row.asr + row.manual + row.frame + row.ocr)) * 100}%` }} /></div></td><td>{number(row.elements)}</td><td><button className="link-button" onClick={() => { if (baseDrillDimension === "label") { setStrategyId("A"); selectModule("strategy", "strategy-discover"); } else showToast(`已定位 ${row.name}`); }}>{row.feature} →</button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -492,25 +563,46 @@ export default function Home() {
               <PanelTitle kicker="CLASSIFICATION SHIFT" title="标签分类迁移" text="对比前后周期，识别主导标记方式发生变化的标签。" />
               <div className="classification-list">
                 {labelGroups.map((item) => (
-                  <div key={item.label}><span><b>{item.label}</b><small>{number(item.volume)} 条</small></span><em className={`kind ${item.kind.includes("ASR") ? "purple" : item.kind.includes("手打") ? "orange" : "gray"}`}>{item.kind}</em><div className="compare-bars"><i style={{ width: `${item.previous}%` }} /><b style={{ width: `${item.current}%` }} /></div><strong>{item.previous}% → {item.current}%</strong></div>
+                  <div key={item.label} className="migration-row">
+                    <span><b>{item.label}</b><small>{number(item.volume)} 条片段</small></span>
+                    <div className="migration-types">
+                      <em className={`kind ${item.previousKind.includes("ASR") ? "purple" : item.previousKind.includes("纯人工") ? "orange" : "gray"}`}>{item.previousKind}</em>
+                      <i>→</i>
+                      <em className={`kind ${item.currentKind.includes("ASR") ? "purple" : item.currentKind.includes("纯人工") ? "orange" : "gray"}`}>{item.currentKind}</em>
+                    </div>
+                    <div className="compare-bars"><i style={{ width: `${item.previous}%` }} /><b style={{ width: `${item.current}%` }} /></div>
+                    <strong>{item.previous}% → {item.current}%</strong>
+                  </div>
                 ))}
               </div>
             </article>
             <article className="panel">
-              <PanelTitle kicker="THREE-LAYER VIEW" title="三层分布圈" text="由外到内：至少一队列主导、全局主导、全队列一致主导。" />
+              <PanelTitle kicker="THREE-LAYER VIEW" title="标签主导属性同心圆" text="由外到内：至少一通道主导、全局主导、全通道主导。" />
+              <div className="dominance-tabs">
+                <button className={dominanceMode === "asr" ? "active" : ""} onClick={() => setDominanceMode("asr")}>ASR 主导</button>
+                <button className={dominanceMode === "manual" ? "active" : ""} onClick={() => setDominanceMode("manual")}>纯人工主导</button>
+              </div>
               <div className="rings-area">
-                <div className="rings">
-                  <i /><b /><span><strong>ASR</strong><small>主导关系</small></span>
+                <div className={`rings ${dominanceMode === "manual" ? "manual-rings" : ""}`}>
+                  <i /><b /><span><strong>{dominanceMode === "asr" ? "ASR" : "纯人工"}</strong><small>主导关系</small></span>
                 </div>
                 <div className="ring-notes">
-                  <p><i className="outer" /><span>至少一队列主导</span><b>86</b></p>
-                  <p><i className="middle" /><span>全局主导</span><b>62</b></p>
-                  <p><i className="inner" /><span>全队列一致主导</span><b>31</b></p>
+                  <p><i className="outer" /><span>至少一通道主导</span><b>{dominanceMode === "asr" ? 86 : 68}</b></p>
+                  <p><i className="middle" /><span>全局主导</span><b>{dominanceMode === "asr" ? 62 : 47}</b></p>
+                  <p><i className="inner" /><span>全通道一致主导</span><b>{dominanceMode === "asr" ? 31 : 24}</b></p>
                 </div>
               </div>
-              <button className="full-button" onClick={() => showToast("已切换为手打主导视角")}>切换为手打主导视角</button>
             </article>
           </section>
+          <article className="panel table-panel">
+            <PanelTitle kicker="MIGRATION DRILLDOWN" title="标签分类变化下钻表" text="完整对照加入选中日期数据前后的主导类型与信号分布。" action={<button className="quiet-button" onClick={() => showToast("标签迁移表已导出")}>导出变化表</button>} />
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>标签</th><th>加入前分类</th><th>加入后分类</th><th>加入前片段</th><th>加入后片段</th><th>加入前主导占比</th><th>加入后主导占比</th><th>变化</th></tr></thead>
+                <tbody>{labelGroups.map((item) => <tr key={item.label}><td><b>{item.label}</b></td><td><span className="type-chip">{item.previousKind}</span></td><td><span className="type-chip current">{item.currentKind}</span></td><td>{number(item.previousSegments)}</td><td>{number(item.currentSegments)}</td><td>{item.previous}%</td><td>{item.current}%</td><td className={item.previousKind === item.currentKind ? "muted" : "danger-text"}>{item.previousKind === item.currentKind ? "保持" : "发生迁移"}</td></tr>)}</tbody>
+              </table>
+            </div>
+          </article>
           <article className="panel">
             <PanelTitle kicker="DOMINANT TYPE TREND" title="标签主导类型趋势" text="按天观察三类标签数量变化，并支持导出分类结果。" action={<button className="quiet-button" onClick={() => showToast("标签分类结果已导出")}>导出分类结果</button>} />
             <LineChart suffix="个" minValue={0} series={[
@@ -519,17 +611,37 @@ export default function Home() {
               { name: "无明显分布", color: "#139d92", values: [86, 88, 87, 90, 91, 92, 94] },
             ]} />
           </article>
+          <section className="grid equal">
+            <article className="panel table-panel">
+              <PanelTitle kicker="CONCENTRIC DRILLDOWN" title={`${dominanceMode === "asr" ? "ASR" : "纯人工"}主导 · 同心圆明细表`} text="按层级与元素数量排序。" action={<button className="quiet-button" onClick={() => showToast("同心圆明细已导出")}>导出明细</button>} />
+              <div className="table-wrap"><table><thead><tr><th>层级</th><th>标签</th><th>全局判定</th><th>主导通道 / 全部通道</th><th>元素数</th><th>片段数</th></tr></thead><tbody>
+                {concentricRows.filter((row) => row.mode === dominanceMode).map((row) => <tr key={`${row.mode}-${row.label}`}><td><span className={`layer-badge layer-${row.layer}`}>{row.layer}</span></td><td><b>{row.label}</b></td><td>{row.global}</td><td>{row.dominantChannels}</td><td>{number(row.elements)}</td><td>{number(row.segments)}</td></tr>)}
+              </tbody></table></div>
+            </article>
+            <article className="panel table-panel">
+              <PanelTitle kicker="CATEGORY ROSTER" title="各分类标签列表" text="分类结果包含元素、片段及四类信号数量。" />
+              <div className="table-wrap"><table><thead><tr><th>标签</th><th>当前分类</th><th>元素数</th><th>片段数</th><th>ASR</th><th>纯人工</th><th>帧</th><th>OCR</th></tr></thead><tbody>
+                {baseRows.map((row, index) => <tr key={row.label}><td><b>{row.label}</b></td><td>{labelGroups[index]?.currentKind ?? "无明显分布"}</td><td>{number(row.elements)}</td><td>{number(row.segments)}</td><td>{number(row.asr)}</td><td>{number(row.manual)}</td><td>{number(row.frame)}</td><td>{number(row.ocr)}</td></tr>)}
+              </tbody></table></div>
+            </article>
+          </section>
       </section>
 
       <section className={`module-section dashboard-view ${baseView === "element" ? "active-view" : ""}`} id="base-element">
         <ModuleHeader index="03" tag="SINGLE ELEMENT" title="单元素分析" text="基于均值、最大值与均值 + 2σ 阈值识别多片段异常元素并下钻明细。" />
+          <nav className="element-stat-tabs" aria-label="单元素统计口径">
+            <span>查看维度</span>
+            <button className={elementStat === "mean" ? "active" : ""} onClick={() => setElementStat("mean")}>平均值</button>
+            <button className={elementStat === "max" ? "active" : ""} onClick={() => setElementStat("max")}>最大值</button>
+            <button className={elementStat === "min" ? "active" : ""} onClick={() => setElementStat("min")}>最小值</button>
+          </nav>
           <section className="metric-grid four">
-            <MetricCard label="平均片段数" value="1.72" delta="+0.08" detail="每个元素" />
-            <MetricCard label="最大片段数" value="12" detail="单元素峰值" tone="ink" />
+            <MetricCard label={`${elementStat === "mean" ? "平均" : elementStat === "max" ? "最大" : "最小"}片段数`} value={elementStat === "mean" ? "1.72" : elementStat === "max" ? "12" : "1"} delta={elementStat === "mean" ? "+0.08" : undefined} detail="每个元素的片段数量" />
+            <MetricCard label={`${elementStat === "mean" ? "平均" : elementStat === "max" ? "最大" : "最小"}标签数`} value={elementStat === "mean" ? "2.36" : elementStat === "max" ? "9" : "1"} detail="每个元素的标签数量" tone="ink" />
+            <MetricCard label={`${elementStat === "mean" ? "平均" : elementStat === "max" ? "最大" : "最小"}视频时长`} value={elementStat === "mean" ? "46.8s" : elementStat === "max" ? "298s" : "3.2s"} detail="元素视频时长" tone="amber" />
             <MetricCard label="异常阈值" value="4.8" detail="均值 + 2σ" tone="amber" />
-            <MetricCard label="异常元素" value="286" delta="-14" detail="较上周期" tone="cyan" />
           </section>
-          <section className="grid two-one">
+          <section className="grid three">
             <article className="panel">
               <PanelTitle kicker="SEGMENTS / ELEMENT" title="单元素片段数分布" text="长尾元素是多片段策略的主要候选池。" />
               <div className="histogram">
@@ -538,14 +650,24 @@ export default function Home() {
               <div className="threshold-note"><i />异常阈值 4.8：超过阈值的元素进入策略候选池</div>
             </article>
             <article className="panel">
-              <PanelTitle kicker="ANOMALY SHARE" title="异常元素构成" />
-              <div className="vertical-stats">
-                <div><span>ASR 多片段</span><b>58%</b><i><em style={{ width: "58%" }} /></i></div>
-                <div><span>手打多片段</span><b>29%</b><i><em style={{ width: "29%" }} /></i></div>
-                <div><span>混合信号</span><b>13%</b><i><em style={{ width: "13%" }} /></i></div>
+              <PanelTitle kicker="LABELS / ELEMENT" title="单元素标签数分布" />
+              <div className="histogram teal-histogram">
+                {[86, 61, 37, 22, 13, 8, 5, 3].map((value, index) => <div key={index}><i style={{ height: `${value}%` }} /><span>{index + 1}{index === 7 ? "+" : ""}</span></div>)}
+              </div>
+            </article>
+            <article className="panel">
+              <PanelTitle kicker="DURATION / ELEMENT" title="元素视频时长分布" />
+              <div className="histogram slate-histogram">
+                {[34, 72, 89, 68, 46, 28, 14].map((value, index) => <div key={index}><i style={{ height: `${value}%` }} /><span>{["0–10s", "10–30s", "30–60s", "1–2m", "2–3m", "3–5m", "5m+"][index]}</span></div>)}
               </div>
             </article>
           </section>
+          <article className="panel table-panel">
+            <PanelTitle kicker="BY LABEL" title="BY 标签片段数量统计" text="按元素指纹 × 标签分组，再按标签聚合均值、最大值与异常元素。" action={<button className="quiet-button" onClick={() => showToast("标签片段统计已导出")}>导出统计</button>} />
+            <div className="table-wrap"><table><thead><tr><th>标签</th><th>平均片段数量</th><th>最大片段数量</th><th>最小片段数量</th><th>异常阈值</th><th>异常元素数</th><th>元素数</th><th>详情</th></tr></thead><tbody>
+              {baseRows.map((row, index) => <tr key={row.label}><td><b>{row.label}</b></td><td>{[1.82, 1.67, 1.94, 1.58, 1.73][index]}</td><td>{[12, 9, 11, 8, 7][index]}</td><td>1</td><td>{[4.8, 4.5, 5.1, 4.3, 4.6][index]}</td><td>{[68, 54, 61, 43, 36][index]}</td><td>{number(row.elements)}</td><td><button className="link-button" onClick={() => showToast(`已展开 ${row.label} 的异常元素`)}>查看异常元素 →</button></td></tr>)}
+            </tbody></table></div>
+          </article>
           <article className="panel table-panel">
             <PanelTitle kicker="OUTLIER LIST" title="异常元素明细" text="点击策略入口可带入当前元素和标签条件。" />
             <div className="table-wrap"><table><thead><tr><th>元素 ID</th><th>标签</th><th>片段数</th><th>标签均值</th><th>偏离</th><th>类型</th><th>状态</th><th /></tr></thead><tbody>
@@ -555,43 +677,44 @@ export default function Home() {
       </section>
 
       <section className={`module-section dashboard-view ${baseView === "cluster" ? "active-view" : ""}`} id="base-cluster">
-        <ModuleHeader index="04" tag="SEGMENT CLUSTER" title="片段聚类数据" text="分别查看 ASR 与手打片段的时长分布，并支持自定义区间生成聚类结果。" />
+        <ModuleHeader index="04" tag="SEGMENT CLUSTER" title="片段聚类数据" text="ASR 片段按文本字数分桶，纯人工片段按片段时长分桶。" />
         <section className="grid equal">
           <article className="panel">
-            <PanelTitle kicker="ASR DURATION" title="ASR 片段时长分布" text="支持自定义区间，观察识别片段集中度。" action={<span className="soft-pill">38.1 万片段</span>} />
+            <PanelTitle kicker="ASR TEXT LENGTH" title="ASR 片段字数分布" text="统计片段区间内 ASR 文本拼接后的总字符数。" action={<span className="soft-pill">38.1 万片段</span>} />
             <div className="bucket-bars">
-              {[18, 46, 83, 70, 51, 34, 21].map((value, index) => <div key={index}><span>{["0–2s", "2–5s", "5–10s", "10–20s", "20–40s", "40–90s", "90s+"][index]}</span><i><b style={{ width: `${value}%` }} /></i><em>{value}%</em></div>)}
+              {[22, 54, 86, 72, 48, 27].map((value, index) => <div key={index}><span>{["0–5字", "6–10字", "11–20字", "21–50字", "51–100字", "100字+"][index]}</span><i><b style={{ width: `${value}%` }} /></i><em>{[8.2, 18.6, 29.4, 23.1, 13.5, 7.2][index]}%</em></div>)}
             </div>
           </article>
-          <article className="panel">
+          <article className="panel manual-duration-panel">
             <PanelTitle kicker="MANUAL DURATION" title="手打片段时长分布" text="对比 ASR 与人工框选的时长结构。" action={<span className="soft-pill">30.7 万片段</span>} />
-            <div className="bucket-bars orange">
-              {[28, 53, 66, 74, 58, 39, 31].map((value, index) => <div key={index}><span>{["0–2s", "2–5s", "5–10s", "10–20s", "20–40s", "40–90s", "90s+"][index]}</span><i><b style={{ width: `${value}%` }} /></i><em>{value}%</em></div>)}
+            <div className="bucket-bars manual-bars">
+              {[28, 53, 66, 74, 58, 39].map((value, index) => <div key={index}><span>{["0–5s", "6–10s", "11–30s", "31–60s", "61–120s", "120s+"][index]}</span><i><b style={{ width: `${value}%` }} /></i><em>{[12.8, 18.3, 24.7, 22.4, 14.1, 7.7][index]}%</em></div>)}
             </div>
           </article>
           <article className="panel custom-bucket">
-            <PanelTitle kicker="CUSTOM BUCKET" title="自定义聚类区间" text="用于快速验证新的时长分组口径。" />
-            <div><label>起始秒数<input defaultValue="2" /></label><label>结束秒数<input defaultValue="8" /></label><button className="primary-button" onClick={() => showToast("已生成 2–8 秒区间")}>生成区间</button></div>
+            <PanelTitle kicker="CUSTOM BUCKET" title="自定义分桶" text="ASR 字数与手打时长分别配置。" />
+            <div><label>ASR 字数分桶<input defaultValue="5,10,20,50,100" /></label><label>手打时长分桶<input defaultValue="5,10,30,60,120" /></label><button className="primary-button" onClick={() => showToast("自定义分桶已重新统计")}>重新统计</button></div>
           </article>
           <article className="panel">
             <PanelTitle kicker="CLUSTER INSIGHT" title="本期观察" />
             <div className="insight-note"><span>01</span><p><b>手打长片段占比上升</b>40 秒以上区间较上期增加 3.4 个百分点。</p></div>
-            <div className="insight-note"><span>02</span><p><b>ASR 集中于 5–20 秒</b>该区间承载约 61% 的识别片段。</p></div>
+            <div className="insight-note"><span>02</span><p><b>ASR 集中于 11–50 字</b>该字数区间承载约 52.5% 的识别片段。</p></div>
           </article>
         </section>
-        <article className="panel table-panel">
-          <PanelTitle kicker="BUCKET COMPARISON" title="片段时长区间对比" text="同时对比 ASR、手打片段在各时长区间的规模、占比与环比变化。" action={<button className="quiet-button" onClick={() => showToast("聚类明细已导出")}>导出明细</button>} />
-          <div className="table-wrap"><table><thead><tr><th>时长区间</th><th>ASR 片段数</th><th>ASR 占比</th><th>手打片段数</th><th>手打占比</th><th>占比差</th><th>环比</th></tr></thead><tbody>
-            {[
-              ["0–2s", "4.8万", "12.6%", "6.4万", "20.8%", "-8.2pp", "+1.8pp"],
-              ["2–5s", "8.6万", "22.6%", "5.9万", "19.2%", "+3.4pp", "+0.6pp"],
-              ["5–10s", "9.7万", "25.5%", "5.4万", "17.6%", "+7.9pp", "-0.3pp"],
-              ["10–20s", "7.2万", "18.9%", "4.8万", "15.6%", "+3.3pp", "+0.9pp"],
-              ["20–40s", "4.1万", "10.8%", "3.7万", "12.1%", "-1.3pp", "+1.1pp"],
-              ["40s+", "3.7万", "9.6%", "4.5万", "14.7%", "-5.1pp", "+3.4pp"],
-            ].map((row) => <tr key={row[0]}>{row.map((cell, index) => <td key={cell} className={index === 6 && cell.startsWith("+") ? "danger-text" : ""}>{index === 0 ? <b>{cell}</b> : cell}</td>)}</tr>)}
-          </tbody></table></div>
-        </article>
+        <section className="grid equal">
+          <article className="panel table-panel">
+            <PanelTitle kicker="ASR BUCKET TABLE" title="ASR 字数分桶明细" action={<button className="quiet-button" onClick={() => showToast("ASR 分桶明细已导出")}>导出 CSV</button>} />
+            <div className="table-wrap"><table><thead><tr><th>字数区间</th><th>片段数</th><th>占比</th><th>累计占比</th></tr></thead><tbody>
+              {[["0–5字", "3.1万", "8.2%", "8.2%"], ["6–10字", "7.1万", "18.6%", "26.8%"], ["11–20字", "11.2万", "29.4%", "56.2%"], ["21–50字", "8.8万", "23.1%", "79.3%"], ["51–100字", "5.1万", "13.5%", "92.8%"], ["100字+", "2.8万", "7.2%", "100%"]].map((row) => <tr key={row[0]}>{row.map((cell, index) => <td key={cell}>{index === 0 ? <b>{cell}</b> : cell}</td>)}</tr>)}
+            </tbody></table></div>
+          </article>
+          <article className="panel table-panel manual-duration-panel">
+            <PanelTitle kicker="MANUAL BUCKET TABLE" title="手打时长分桶明细" action={<button className="quiet-button" onClick={() => showToast("手打分桶明细已导出")}>导出 CSV</button>} />
+            <div className="table-wrap"><table><thead><tr><th>时长区间</th><th>片段数</th><th>占比</th><th>累计占比</th></tr></thead><tbody>
+              {[["0–5s", "3.9万", "12.8%", "12.8%"], ["6–10s", "5.6万", "18.3%", "31.1%"], ["11–30s", "7.6万", "24.7%", "55.8%"], ["31–60s", "6.9万", "22.4%", "78.2%"], ["61–120s", "4.3万", "14.1%", "92.3%"], ["120s+", "2.4万", "7.7%", "100%"]].map((row) => <tr key={row[0]}>{row.map((cell, index) => <td key={cell}>{index === 0 ? <b>{cell}</b> : cell}</td>)}</tr>)}
+            </tbody></table></div>
+          </article>
+        </section>
       </section>
     </>
   );
@@ -606,7 +729,7 @@ export default function Home() {
         {qualityViews.map((view) => <button key={view.id} className={qualityView === view.id ? "active" : ""} onClick={() => selectModule("quality", `quality-${view.id}`)}><i>{String(qualityViews.findIndex((item) => item.id === view.id) + 1).padStart(2, "0")}</i><b>{view.label}</b><span>{view.hint}</span><em>→</em></button>)}
       </nav>
       <section className={`module-section dashboard-view ${qualityView === "metrics" ? "active-view" : ""}`} id="quality-metrics">
-        <ModuleHeader index="01" tag="QUALITY METRICS" title="质量指标" text="观察 IoU、正确打标率、标签匹配度、段落精准率、综合准确率、重复差异与极端短耗时。" />
+        <ModuleHeader index="01" tag="QUALITY METRICS" title="质量指标" text="观察 IoU、正确打标率、简单重复差异与平均审核耗时。" />
           <div className="metric-selector">
             {Object.entries(qualityMetrics).map(([key, metric]) => <button key={key} className={metricKey === key ? "active" : ""} onClick={() => setMetricKey(key as keyof typeof qualityMetrics)}><span>{metric.label}</span><b>{metric.value}</b><em>{metric.delta}</em></button>)}
           </div>
@@ -619,7 +742,7 @@ export default function Home() {
           <section className="grid two-one">
             <article className="panel">
               <PanelTitle kicker="OVERALL TREND" title={`${activeMetric.label} · 全量趋势`} text="指标选择会同步更新趋势与维度定位。" action={<span className="big-delta"><b>{activeMetric.value}</b><em>{activeMetric.delta}</em></span>} />
-              <LineChart series={[{ name: activeMetric.label, color: activeMetric.color, values: activeMetric.values }]} minValue={metricKey === "repeat" || metricKey === "fast" ? 0 : undefined} />
+              <LineChart series={[{ name: activeMetric.label, color: activeMetric.color, values: activeMetric.values }]} minValue={metricKey === "repeat" ? 0 : undefined} />
             </article>
             <article className="panel">
               <PanelTitle kicker="ERROR STRUCTURE" title="差错结构 M6" text="按差错类型拆解当前质量损失。" />
@@ -649,21 +772,20 @@ export default function Home() {
               </div>
             </article>
           </section>
-          <article className="panel dimension-trend">
-            <PanelTitle
-              kicker="DIMENSION TREND"
-              title="分维度质量趋势"
-              text="切换团队、队列或标签维度，比较主要分组的质量变化。"
-              action={<div className="dimension-tabs"><button className={qualityDimension === "team" ? "active" : ""} onClick={() => setQualityDimension("team")}>团队</button><button className={qualityDimension === "channel" ? "active" : ""} onClick={() => setQualityDimension("channel")}>队列</button><button className={qualityDimension === "label" ? "active" : ""} onClick={() => setQualityDimension("label")}>标签</button></div>}
-            />
-            <LineChart series={
-              qualityDimension === "team"
-                ? [{ name: "团队 A", color: "#5f6ff5", values: [88, 88.6, 89.1, 89.8, 90.2, 91, 91.4] }, { name: "团队 C", color: "#139d92", values: [84.2, 85, 84.6, 85.8, 86.1, 87.2, 87.8] }]
-                : qualityDimension === "channel"
-                  ? [{ name: "队列 01", color: "#5f6ff5", values: [90, 89.6, 90.4, 91.2, 91.6, 92, 92.4] }, { name: "队列 04", color: "#e9a23b", values: [84.8, 85.3, 85.1, 86, 86.6, 86.2, 87.1] }]
-                  : [{ name: "标签组 A", color: "#5f6ff5", values: [86.1, 87, 87.4, 88.2, 89, 89.6, 90.1] }, { name: "标签组 C", color: "#dd647a", values: [83.8, 84.2, 84, 85.1, 85.7, 86.4, 86.9] }]
-            } />
-          </article>
+          <section className="grid three quality-dimensions">
+            <article className="panel">
+              <PanelTitle kicker="BY TEAM" title="BY 团队质量趋势" text="对比主要审核团队的当前质量表现。" />
+              <LineChart series={[{ name: "团队 A", color: "#2448a8", values: [88, 88.6, 89.1, 89.8, 90.2, 91, 91.4] }, { name: "团队 C", color: "#008f83", values: [84.2, 85, 84.6, 85.8, 86.1, 87.2, 87.8] }]} />
+            </article>
+            <article className="panel">
+              <PanelTitle kicker="BY CHANNEL" title="BY 通道质量趋势" text="定位不同审核通道之间的质量差异。" />
+              <LineChart series={[{ name: "通道 01", color: "#2448a8", values: [90, 89.6, 90.4, 91.2, 91.6, 92, 92.4] }, { name: "通道 04", color: "#c47a15", values: [84.8, 85.3, 85.1, 86, 86.6, 86.2, 87.1] }]} />
+            </article>
+            <article className="panel">
+              <PanelTitle kicker="BY LABEL" title="BY 标签质量趋势" text="观察主要标签组的质量变化与差距。" />
+              <LineChart series={[{ name: "标签组 A", color: "#2448a8", values: [86.1, 87, 87.4, 88.2, 89, 89.6, 90.1] }, { name: "标签组 C", color: "#d25165", values: [83.8, 84.2, 84, 85.1, 85.7, 86.4, 86.9] }]} />
+            </article>
+          </section>
       </section>
 
       <section className={`module-section dashboard-view ${qualityView === "duration" ? "active-view" : ""}`} id="quality-duration">
@@ -687,6 +809,22 @@ export default function Home() {
                 <button className={durationReason === "不合理" ? "active red" : ""} onClick={() => setDurationReason("不合理")}><span>不合理</span><b>1,268</b></button>
               </div>
               <p className="logic-note"><b>判定口径</b>：超长 ≥ 视频时长 90%；超短 ≤ 2 秒。合理性根据标签的业务属性字典判断。</p>
+            </article>
+          </section>
+          <section className="grid equal duration-drill-grid">
+            <article className="panel">
+              <PanelTitle kicker="OVERLONG DRILLDOWN" title="超长片段下钻" text="同时呈现标签与通道两个维度的集中度。" />
+              <div className="dual-ranking">
+                <section><h4>BY 标签</h4>{[["标签组 C-02", 86, "426"], ["标签组 A-01", 68, "338"], ["标签组 D-03", 51, "254"], ["标签组 B-04", 39, "194"]].map(([name, value, count]) => <div key={name}><span>{name}</span><i><b style={{ width: `${value}%` }} /></i><strong>{count}</strong></div>)}</section>
+                <section><h4>BY 通道</h4>{[["通道 04", 78, "388"], ["通道 02", 65, "324"], ["通道 01", 57, "284"], ["通道 03", 49, "244"]].map(([name, value, count]) => <div key={name}><span>{name}</span><i><b style={{ width: `${value}%` }} /></i><strong>{count}</strong></div>)}</section>
+              </div>
+            </article>
+            <article className="panel">
+              <PanelTitle kicker="OVERSHORT DRILLDOWN" title="超短片段下钻" text="对照标签与通道定位极短片段的主要来源。" />
+              <div className="dual-ranking short">
+                <section><h4>BY 标签</h4>{[["标签组 A-01", 88, "516"], ["标签组 E-05", 71, "418"], ["标签组 B-04", 54, "318"], ["标签组 C-02", 43, "252"]].map(([name, value, count]) => <div key={name}><span>{name}</span><i><b style={{ width: `${value}%` }} /></i><strong>{count}</strong></div>)}</section>
+                <section><h4>BY 通道</h4>{[["通道 02", 82, "481"], ["通道 03", 66, "388"], ["通道 04", 55, "323"], ["通道 01", 47, "276"]].map(([name, value, count]) => <div key={name}><span>{name}</span><i><b style={{ width: `${value}%` }} /></i><strong>{count}</strong></div>)}</section>
+              </div>
             </article>
           </section>
           <article className="panel table-panel">
@@ -833,6 +971,21 @@ export default function Home() {
             <>
               <section className="metric-grid four"><MetricCard label="问题解决率" value="70.8%" delta="+12.5%" detail="已完成 / 总问题" tone="cyan" /><MetricCard label="逾期率" value="8.3%" delta="-4.2%" detail="超过 DDL" tone="rose" /><MetricCard label="平均推进率" value="68.2%" delta="+9.6%" detail="流程完成度" /><MetricCard label="平均解决时长" value="2.4天" delta="-0.7天" detail="从定义到完成" tone="amber" /></section>
               <section className="grid two-one"><article className="panel"><PanelTitle kicker="SOLUTION EFFICIENCY" title="解决率、逾期率与推进率" /><LineChart series={[{ name: "解决率", color: "#15a98c", values: [42, 48, 53, 57, 61, 66, 70.8] }, { name: "推进率", color: "#7357ff", values: [38, 44, 49, 55, 59, 64, 68.2] }, { name: "逾期率反向值", color: "#e16a73", values: [82, 84, 85, 87, 88, 90, 91.7] }]} /></article><article className="panel"><PanelTitle kicker="STATUS SNAPSHOT" title="三类问题状态" /><div className="status-matrix">{[["产品", 2, 3, 6], ["人审", 1, 2, 5], ["规则 / SOP", 2, 2, 3]].map(([name, pending, active, done]) => <div key={String(name)}><b>{name}</b><span><i className="wait" />待处理 {pending}</span><span><i className="doing" />处理中 {active}</span><span><i className="done" />已完成 {done}</span></div>)}</div></article></section>
+              <section className="grid equal owner-efficiency">
+                <article className="panel table-panel">
+                  <PanelTitle kicker="OWNER EFFICIENCY" title="负责人推进效率" text="按负责人查看承接量、解决率、推进速度和逾期情况。" />
+                  <div className="table-wrap"><table><thead><tr><th>负责人</th><th>承接问题</th><th>已解决率</th><th>平均推进率</th><th>平均解决时长</th><th>逾期</th><th>本周完成</th></tr></thead><tbody>
+                    {[["协同角色 01", 8, "87.5%", "82%", "1.8 天", 0, 5], ["协同角色 02", 7, "71.4%", "74%", "2.2 天", 1, 3], ["协同角色 03", 5, "60.0%", "61%", "2.9 天", 1, 2], ["协同角色 04", 4, "50.0%", "56%", "3.4 天", 0, 2]].map((row) => <tr key={String(row[0])}><td><b>{row[0]}</b></td><td>{row[1]}</td><td>{row[2]}</td><td>{row[3]}</td><td>{row[4]}</td><td className={Number(row[5]) > 0 ? "danger-text" : ""}>{row[5]}</td><td>{row[6]}</td></tr>)}
+                  </tbody></table></div>
+                </article>
+                <article className="panel">
+                  <PanelTitle kicker="OWNER LOAD" title="负责人 × 问题类型" text="问题承接结构与当前推进负载。" />
+                  <div className="owner-load">
+                    <div className="owner-load-head"><span /><b>产品</b><b>人审</b><b>规则</b><b>SOP</b></div>
+                    {[["角色 01", 82, 34, 58, 22], ["角色 02", 61, 72, 43, 31], ["角色 03", 38, 56, 77, 49], ["角色 04", 29, 41, 52, 68]].map(([owner, ...values]) => <div key={String(owner)}><span>{owner}</span>{values.map((value, index) => <i key={index} style={{ "--load": Number(value) / 100 } as React.CSSProperties}>{value}</i>)}</div>)}
+                  </div>
+                </article>
+              </section>
             </>
           )}
           <article className="loop-complete"><div><span>闭环回流</span><h3>监测结果将成为下一轮异常发现的策略输入</h3><p>当异常率、归因结构或解决效率偏离目标时，系统建议调整策略阈值、抽样范围或协同动作。</p></div><button onClick={() => selectModule("strategy", "strategy-discover")}>开始下一轮 ↗</button></article>

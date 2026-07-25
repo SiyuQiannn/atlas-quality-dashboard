@@ -64,6 +64,12 @@ test("keeps all dashboard modules visible, chart-led, and anchored in the source
     "归因监测",
     "效率监测",
     "全局问题池",
+    "BY 标签",
+    "BY 团队",
+    "BY 通道",
+    "标签分类变化下钻表",
+    "同心圆明细表",
+    "负责人推进效率",
   ]) {
     assert.match(page, new RegExp(label));
   }
@@ -75,8 +81,18 @@ test("keeps all dashboard modules visible, chart-led, and anchored in the source
   assert.match(page, /strategyStep === "solve"/);
   assert.match(page, /strategyStep === "monitor"/);
   assert.match(page, /dashboard-view/);
-  assert.match(page, /scrollIntoView/);
+  assert.match(page, /fixedNavigationHeight/);
+  assert.match(page, /getBoundingClientRect/);
+  assert.match(page, /previousKind/);
+  assert.match(page, /currentKind/);
+  assert.match(page, /ASR 片段字数分布/);
+  assert.match(page, /手打片段时长分布/);
+  assert.doesNotMatch(page, /ASR 片段时长分布/);
+  assert.doesNotMatch(page, /scrollIntoView/);
   assert.match(styles, /\.dashboard-view,\s*\.dashboard-view\.active-view\s*\{\s*display: block/);
+  assert.match(styles, /\.chart-legend/);
+  assert.match(styles, /\.manual-duration-panel/);
+  assert.match(styles, /font-size:\s*15px/);
   assert.match(styles, /chart-sweep|ring-enter|bar-grow|heat-pop/);
   assert.doesNotMatch(page, /<Filters|function Filters|filter-bar|strategy-toolbar/);
   assert.doesNotMatch(page, /intro-stat|loop-badge|activeSection|scrollToSection|DESENSITIZED/);
