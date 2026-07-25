@@ -315,10 +315,6 @@ export default function Home() {
   const [strategyId, setStrategyId] = useState<StrategyId>("A");
   const [metricKey, setMetricKey] = useState<keyof typeof qualityMetrics>("iou");
   const [qualityDimension, setQualityDimension] = useState<"team" | "channel" | "label">("team");
-  const [period, setPeriod] = useState("近 7 天");
-  const [team, setTeam] = useState("全部团队");
-  const [channel, setChannel] = useState("全部队列");
-  const [label, setLabel] = useState("全部标签");
   const [durationReason, setDurationReason] = useState("全部");
   const [checkedSamples, setCheckedSamples] = useState<string[]>(["S-2407-01", "S-2407-02", "S-2407-03", "S-2407-04"]);
   const [trackedSamples, setTrackedSamples] = useState<string[]>(["S-2407-01", "S-2407-02", "S-2407-03", "S-2407-04"]);
@@ -368,7 +364,9 @@ export default function Home() {
     if (tab === "base") setBaseView(id.replace("base-", "") as BaseView);
     if (tab === "quality") setQualityView(id.replace("quality-", "") as QualityView);
     if (tab === "strategy") setStrategyStep(id.replace("strategy-", "") as StrategyStep);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 40);
   };
 
   const updateDefinition = (sampleId: string, patch: Partial<Definition>) => {
@@ -429,8 +427,6 @@ export default function Home() {
           </button>
         ))}
       </nav>
-
-      <Filters period={period} setPeriod={setPeriod} team={team} setTeam={setTeam} channel={channel} setChannel={setChannel} label={label} setLabel={setLabel} />
 
       <section className={`module-section dashboard-view ${baseView === "overview" ? "active-view" : ""}`} id="base-overview">
         <ModuleHeader index="01" tag="DATA OVERVIEW" title="数据概览" text="汇总片段规模、元素规模、标记方式构成与标签/队列维度表现。" />
@@ -609,8 +605,6 @@ export default function Home() {
         <header><span>PAGE INDEX</span><b>质量数据板块</b></header>
         {qualityViews.map((view) => <button key={view.id} className={qualityView === view.id ? "active" : ""} onClick={() => selectModule("quality", `quality-${view.id}`)}><i>{String(qualityViews.findIndex((item) => item.id === view.id) + 1).padStart(2, "0")}</i><b>{view.label}</b><span>{view.hint}</span><em>→</em></button>)}
       </nav>
-      <Filters period={period} setPeriod={setPeriod} team={team} setTeam={setTeam} channel={channel} setChannel={setChannel} label={label} setLabel={setLabel} />
-
       <section className={`module-section dashboard-view ${qualityView === "metrics" ? "active-view" : ""}`} id="quality-metrics">
         <ModuleHeader index="01" tag="QUALITY METRICS" title="质量指标" text="观察 IoU、正确打标率、标签匹配度、段落精准率、综合准确率、重复差异与极端短耗时。" />
           <div className="metric-selector">
@@ -711,12 +705,6 @@ export default function Home() {
         <div><span className="eyebrow">STRATEGY DATA</span><h2>策略数据</h2><p>异常发现、问题定义、问题解决与数据监测的全流程管理。</p></div>
       </section>
 
-      <div className="strategy-toolbar">
-        <label><span>当前策略</span><select value={strategyId} onChange={(event) => setStrategyId(event.target.value as StrategyId)}><option value="A">策略 A · 少数位置分布</option><option value="B">策略 B · 多片段异常</option></select></label>
-        <div><span className="live-dot" />当前批次 B-2407-W4</div>
-        <button onClick={() => showToast("策略口径已展开")}>查看策略口径</button>
-      </div>
-
       <nav className="strategy-stepper" aria-label="策略闭环步骤">
         {strategySteps.map((step, index) => (
           <button key={step.id} className={strategyStep === step.id ? "active" : ""} onClick={() => selectModule("strategy", `strategy-${step.id}`)}>
@@ -726,8 +714,8 @@ export default function Home() {
       </nav>
 
       <section className="strategy-context">
-        <div><span>策略说明</span><b>{strategyCopy[strategyId].title}</b><p>{strategyCopy[strategyId].summary}</p></div>
-        <div><span>识别口径</span><p>{strategyCopy[strategyId].rule}</p></div>
+        <div className="strategy-choice"><span>策略视角</span><button className={strategyId === "A" ? "active" : ""} onClick={() => setStrategyId("A")}>少数位置分布</button><button className={strategyId === "B" ? "active" : ""} onClick={() => setStrategyId("B")}>多片段异常</button></div>
+        <div><span>当前策略</span><b>{strategyCopy[strategyId].title}</b></div>
         <div><span>本批命中</span><b>{strategyCopy[strategyId].hits}</b></div>
       </section>
 
@@ -908,35 +896,5 @@ export default function Home() {
 
       {toast && <div className="toast" role="status"><span>✓</span>{toast}</div>}
     </main>
-  );
-}
-
-function Filters({
-  period,
-  setPeriod,
-  team,
-  setTeam,
-  channel,
-  setChannel,
-  label,
-  setLabel,
-}: {
-  period: string;
-  setPeriod: (value: string) => void;
-  team: string;
-  setTeam: (value: string) => void;
-  channel: string;
-  setChannel: (value: string) => void;
-  label: string;
-  setLabel: (value: string) => void;
-}) {
-  return (
-    <section className="filter-bar">
-      <label><span>时间范围</span><select value={period} onChange={(event) => setPeriod(event.target.value)}><option>近 7 天</option><option>近 30 天</option><option>本季度</option></select></label>
-      <label><span>团队</span><select value={team} onChange={(event) => setTeam(event.target.value)}><option>全部团队</option><option>团队 A</option><option>团队 B</option><option>团队 C</option><option>团队 D</option></select></label>
-      <label><span>队列</span><select value={channel} onChange={(event) => setChannel(event.target.value)}><option>全部队列</option><option>队列 01</option><option>队列 02</option><option>队列 03</option><option>队列 04</option></select></label>
-      <label className="grow"><span>标签</span><select value={label} onChange={(event) => setLabel(event.target.value)}><option>全部标签</option><option>标签组 A</option><option>标签组 B</option><option>标签组 C</option><option>标签组 D</option></select></label>
-      <div className="filter-status"><i />筛选已同步</div>
-    </section>
   );
 }

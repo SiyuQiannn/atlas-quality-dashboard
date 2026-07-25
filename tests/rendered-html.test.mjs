@@ -41,10 +41,11 @@ test("server-renders the three-page dashboard with base data as default", async 
   assert.doesNotMatch(html, /脱敏|演示|面试|不连接公司系统|DEMO ONLY/);
 });
 
-test("keeps all dashboard modules and social preview in the source artifact", async () => {
-  const [page, layout] = await Promise.all([
+test("keeps all dashboard modules visible, chart-led, and anchored in the source artifact", async () => {
+  const [page, layout, styles] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     access(new URL("../public/og-v2.png", import.meta.url)),
   ]);
 
@@ -74,6 +75,10 @@ test("keeps all dashboard modules and social preview in the source artifact", as
   assert.match(page, /strategyStep === "solve"/);
   assert.match(page, /strategyStep === "monitor"/);
   assert.match(page, /dashboard-view/);
+  assert.match(page, /scrollIntoView/);
+  assert.match(styles, /\.dashboard-view,\s*\.dashboard-view\.active-view\s*\{\s*display: block/);
+  assert.match(styles, /chart-sweep|ring-enter|bar-grow|heat-pop/);
+  assert.doesNotMatch(page, /<Filters|function Filters|filter-bar|strategy-toolbar/);
   assert.doesNotMatch(page, /intro-stat|loop-badge|activeSection|scrollToSection|DESENSITIZED/);
   assert.doesNotMatch(page, /脱敏|演示|面试|不连接公司系统|DEMO ONLY/);
   assert.doesNotMatch(layout, /脱敏|演示|面试|作品集/);
