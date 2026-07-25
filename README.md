@@ -1,98 +1,42 @@
-# vinext-starter
+# Atlas 广告审核质量看板
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+面向广告审核质量运营场景的数据产品，覆盖基础数据分析、质量诊断、策略闭环和运营洞察。
 
-## Prerequisites
+[在线查看 Atlas 看板](https://atlas-quality-demo-260724.siyu-qian0513.chatgpt.site)
 
-- Node.js `>=22.13.0`
+## 核心能力
 
-## Quick Start
+- 基础数据：数据概览、标签分布、单元素分析和片段聚类。
+- 质量数据：质量指标、异常时长片段、根因诊断及审核员表现定位。
+- 策略数据：异常发现、问题定义、问题解决、效果监测的完整闭环。
+- 运营洞察：产能效率、风险画像和跨团队协同健康。
+- 交互下钻：支持从标签、团队、通道、审核员和异常元素进入视频片段证据详情。
+
+## 策略闭环
+
+1. 通过标签迁移、多片段、极端时长和质量突降发现异常样本。
+2. 结合录屏、打标片段与审核记录完成问题归因。
+3. 将问题聚合后分配负责人，跟踪处理、验证与全局问题沉淀。
+4. 监测质量、归因和解决效率，并将结果回流至下一轮策略。
+
+## 技术实现
+
+- Next.js / React / TypeScript
+- CSS 数据可视化与动态交互
+- vinext / Cloudflare Workers
+- Node.js 原生回归测试
+
+## 本地运行
 
 ```bash
-npm install
-npm run dev
-npm run build
+pnpm install
+pnpm run dev
 ```
 
-This starter does not use `wrangler.jsonc`.
+构建与检查：
 
-## Included Shape
-
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
-
-## Workspace Auth Headers
-
-OpenAI workspace sites can read the current user's email from
-`oai-authenticated-user-email`.
-
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
+```bash
+pnpm run build
+pnpm run lint
+node --test tests/rendered-html.test.mjs
 ```
-
-## Optional Dispatch-Owned ChatGPT Sign-In
-
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
-
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
-
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
-
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
-
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
-
-## Useful Commands
-
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
-- `npm run db:generate`: generate Drizzle migrations after schema changes
-
-## Learn More
-
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)

@@ -23,7 +23,7 @@ async function render() {
   );
 }
 
-test("server-renders the three-page dashboard with base data as default", async () => {
+test("server-renders the four-view dashboard with base data as default", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
@@ -33,6 +33,7 @@ test("server-renders the three-page dashboard with base data as default", async 
   assert.match(html, /基础数据/);
   assert.match(html, /质量数据/);
   assert.match(html, /策略数据/);
+  assert.match(html, /运营洞察/);
   assert.match(html, /数据概览/);
   assert.match(html, /标签分布分析/);
   assert.match(html, /单元素分析/);
@@ -70,6 +71,16 @@ test("keeps all dashboard modules visible, chart-led, and anchored in the source
     "标签分类变化下钻表",
     "同心圆明细表",
     "负责人推进效率",
+    "少数分布",
+    "违规分布条",
+    "异常元素详情",
+    "质量根因诊断",
+    "需重点关注审核员",
+    "审核员质量与效率分布",
+    "审核员质量诊断明细",
+    "产能与效率",
+    "风险画像",
+    "协同健康",
   ]) {
     assert.match(page, new RegExp(label));
   }
@@ -85,15 +96,37 @@ test("keeps all dashboard modules visible, chart-led, and anchored in the source
   assert.match(page, /getBoundingClientRect/);
   assert.match(page, /previousKind/);
   assert.match(page, /currentKind/);
+  assert.match(page, /syncActiveSection/);
+  assert.match(page, /element-detail-drawer/);
+  assert.match(page, /BubbleCluster/);
+  assert.match(page, /RoseDistribution/);
+  assert.match(page, /word-orbit-chart/);
+  assert.match(page, /ridge-distribution/);
+  assert.match(page, /RadarProfile/);
+  assert.match(page, /FunnelFlow/);
+  assert.match(page, /strategy-command-grid/);
+  assert.doesNotMatch(page, /信号关联分析|base-relations|signal-network/);
+  assert.match(page, /hourly-orbit/);
+  assert.match(page, /risk-spread/);
+  assert.match(page, /handoff-network/);
+  assert.doesNotMatch(page, /标记方式构成/);
   assert.match(page, /ASR 片段字数分布/);
-  assert.match(page, /手打片段时长分布/);
+  assert.match(page, /手打片段时长密度分布/);
+  assert.doesNotMatch(page, /山脊图|玫瑰图|轨道图|气泡图|辅助信号/);
   assert.doesNotMatch(page, /ASR 片段时长分布/);
   assert.doesNotMatch(page, /scrollIntoView/);
   assert.match(styles, /\.dashboard-view,\s*\.dashboard-view\.active-view\s*\{\s*display: block/);
   assert.match(styles, /\.chart-legend/);
   assert.match(styles, /\.manual-duration-panel/);
+  assert.match(styles, /dashboard-aurora/);
+  assert.match(styles, /\.bubble-cluster/);
+  assert.match(styles, /\.element-detail-drawer/);
+  assert.match(styles, /\.auditor-diagnostics/);
+  assert.match(styles, /\.auditor-scatter/);
   assert.match(styles, /font-size:\s*15px/);
   assert.match(styles, /chart-sweep|ring-enter|bar-grow|heat-pop/);
+  assert.match(styles, /strategy-panel-enter|ribbon-current|anomaly-cell-breathe|loop-scan/);
+  assert.match(styles, /\.content-strategy #strategy-monitor/);
   assert.doesNotMatch(page, /<Filters|function Filters|filter-bar|strategy-toolbar/);
   assert.doesNotMatch(page, /intro-stat|loop-badge|activeSection|scrollToSection|DESENSITIZED/);
   assert.doesNotMatch(page, /脱敏|演示|面试|不连接公司系统|DEMO ONLY/);
