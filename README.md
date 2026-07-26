@@ -2,7 +2,7 @@
 
 面向广告审核质量运营场景的数据产品，覆盖基础数据分析、质量诊断、策略闭环和运营洞察。
 
-[在线查看 Atlas 看板](https://atlas-quality-demo-260724.siyu-qian0513.chatgpt.site)
+[在线查看 Atlas 看板](https://siyuqiannn.github.io/atlas-quality-dashboard/)
 
 ## 核心能力
 
@@ -24,6 +24,7 @@
 - Next.js / React / TypeScript
 - CSS 数据可视化与动态交互
 - vinext / Cloudflare Workers
+- GitHub Pages 自动部署
 - Node.js 原生回归测试
 
 ## 本地运行
